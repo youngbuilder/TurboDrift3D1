@@ -32,6 +32,7 @@ export interface VehicleState {
   wheelRotation: number;
   isBoosting: boolean;
   boostTimer: number;
+  activeBoostLevel: 0 | 1 | 2 | 3;
   hasShield: boolean;
   shieldTimer: number;
   isSpinning: boolean;
@@ -44,6 +45,7 @@ export interface VehicleState {
   isFinished: boolean;
   finishTime: number;
   rank: number;
+  hasReachedHalfway?: boolean;
 }
 
 export interface BotRacer {
@@ -73,6 +75,7 @@ export interface BotRacer {
   boostTimer: number;
   isSpinning: boolean;
   spinTimer: number;
+  hasReachedHalfway?: boolean;
 }
 
 export class PhysicsEngine {
@@ -105,6 +108,7 @@ export class PhysicsEngine {
       wheelRotation: 0,
       isBoosting: false,
       boostTimer: 0,
+      activeBoostLevel: 0,
       hasShield: false,
       shieldTimer: 0,
       isSpinning: false,
@@ -117,6 +121,7 @@ export class PhysicsEngine {
       isFinished: false,
       finishTime: 0,
       rank: 1,
+      hasReachedHalfway: false,
     };
   }
 
@@ -142,7 +147,7 @@ export class PhysicsEngine {
     totalLaps: number
   ) {
     if (state.isFinished) {
-      state.speedKmh = Math.max(0, state.speedKmh - 60 * delta);
+      state.speedKmh = Math.max(0, state.speedKmh - 40 * delta);
       state.position.addScaledVector(
         new THREE.Vector3(0, 0, 1).applyQuaternion(state.quaternion),
         (state.speedKmh / 3.6) * delta
@@ -164,6 +169,7 @@ export class PhysicsEngine {
       state.boostTimer -= delta;
       if (state.boostTimer <= 0) {
         state.isBoosting = false;
+        state.activeBoostLevel = 0;
       }
     }
 
@@ -176,7 +182,8 @@ export class PhysicsEngine {
 
     const cfg = VEHICLE_CONFIGS[state.modelType] || VEHICLE_CONFIGS.sport;
     const baseMaxSpeed = cfg.maxSpeed;
-    const boostMaxSpeed = cfg.maxSpeed + 55;
+    const extraMax = state.isBoosting ? (state.activeBoostLevel === 3 ? 120 : (state.activeBoostLevel === 2 ? 75 : 40)) : 0;
+    const boostMaxSpeed = cfg.maxSpeed + extraMax;
     const maxSpeed = state.isBoosting ? boostMaxSpeed : baseMaxSpeed;
     const accelRate = (state.isBoosting ? cfg.acceleration * 2.0 : cfg.acceleration) * 1.6;
     const brakeRate = 180;
@@ -221,10 +228,14 @@ export class PhysicsEngine {
     } else {
       if (state.isDrifting) {
         if (state.driftBoostLevel > 0) {
-          const boostDurations = [0, 1.2, 2.0, 3.2];
+          const boostDurations = [0, 1.2, 2.0, 3.8];
+          const boostSpeeds = [0, 35, 75, 130];
           state.isBoosting = true;
           state.boostTimer = boostDurations[state.driftBoostLevel];
-          state.speedKmh = Math.min(boostMaxSpeed, state.speedKmh + state.driftBoostLevel * 35 * cfg.driftPower);
+          state.activeBoostLevel = state.driftBoostLevel;
+          const extraMax = state.driftBoostLevel === 3 ? 120 : (state.driftBoostLevel === 2 ? 75 : 40);
+          const boostMax = cfg.maxSpeed + extraMax;
+          state.speedKmh = Math.min(boostMax, state.speedKmh + boostSpeeds[state.driftBoostLevel] * cfg.driftPower);
           sound.playBoost();
         }
         state.isDrifting = false;
@@ -300,24 +311,55 @@ export class PhysicsEngine {
   }
 
   private static updateProgress(state: VehicleState, track: TrackData, totalLaps: number) {
-    const nextCpIdx = (state.currentCheckpoint + 1) % track.checkpoints.length;
-    const targetCp = track.checkpoints[nextCpIdx];
-    const dist = state.position.distanceTo(targetCp.position);
-    if (dist < 28) {
-      state.currentCheckpoint = nextCpIdx;
-      if (nextCpIdx === 0) {
-        if (state.currentLap >= totalLaps) {
-          state.isFinished = true;
-          state.finishTime = Date.now();
-          sound.playVictoryFanfare();
-        } else {
-          state.currentLap += 1;
-          sound.playLapChime();
+    let bestT = state.trackT || 0;
+    let minDist = 999999;
+    const samples = 45;
+    const startT = Math.max(0, bestT - 0.25);
+    const endT = Math.min(1.0, bestT + 0.25);
+
+    for (let i = 0; i <= samples; i++) {
+      const t = startT + (i / samples) * (endT - startT);
+      const pt = track.curve.getPointAt(t);
+      const d = state.position.distanceTo(pt);
+      if (d < minDist) {
+        minDist = d;
+        bestT = t;
+      }
+    }
+
+    for (let offset of [-1.0, 1.0]) {
+      const testT = state.trackT + offset;
+      if (testT >= 0 && testT <= 1) {
+        const pt = track.curve.getPointAt(testT);
+        const d = state.position.distanceTo(pt);
+        if (d < minDist) {
+          minDist = d;
+          bestT = testT >= 1 ? testT - 1 : testT < 0 ? testT + 1 : testT;
         }
       }
     }
-    const checkpointNorm = state.currentCheckpoint / track.checkpoints.length;
-    state.totalProgress = state.currentLap - 1 + checkpointNorm;
+
+    const distToStart = state.position.distanceTo(track.startPosition);
+    if (distToStart < 30 && state.trackT > 0.7) {
+      bestT = 0.01;
+    }
+
+    const prevT = state.trackT;
+    state.trackT = bestT;
+
+    if (prevT > 0.8 && bestT < 0.2) {
+      state.currentLap += 1;
+      if (state.currentLap > totalLaps) {
+        state.isFinished = true;
+        state.finishTime = Date.now();
+        sound.playVictoryFanfare();
+      } else {
+        sound.playLapChime();
+      }
+    }
+
+    state.currentCheckpoint = Math.floor(bestT * track.checkpoints.length);
+    state.totalProgress = state.currentLap - 1 + bestT;
   }
 
   public static useItem(state: VehicleState): { type: ItemType; position: THREE.Vector3 } | null {
@@ -371,10 +413,6 @@ export class PhysicsEngine {
     ];
     const botModels: CarModelType[] = ['sport', 'bike', 'sedan', 'suv'];
     
-    // AI Difficulty tuning:
-    // Easy: 120 km/h
-    // Medium: 155 km/h
-    // Hard: 195 km/h (fully competitive, challenging enough to beat player if player makes mistakes)
     const baseSpeed = difficulty === 'easy' ? 120 : difficulty === 'medium' ? 155 : 195;
     const accelFactor = difficulty === 'easy' ? 40 : difficulty === 'medium' ? 65 : 95;
 
@@ -427,6 +465,7 @@ export class PhysicsEngine {
         boostTimer: 0,
         isSpinning: false,
         spinTimer: 0,
+        hasReachedHalfway: false,
       });
     }
     return bots;

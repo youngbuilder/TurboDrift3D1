@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import confetti from 'canvas-confetti';
@@ -30,9 +30,10 @@ export const Podium: React.FC<PodiumProps> = ({
 }) => {
   const mountRef = useRef<HTMLDivElement>(null);
   const animFrameRef = useRef<number | null>(null);
+  const [countdown, setCountdown] = useState<number>(10);
 
   useEffect(() => {
-    const duration = 4.5 * 1000;
+    const duration = 4.0 * 1000;
     const end = Date.now() + duration;
 
     (function frame() {
@@ -55,6 +56,19 @@ export const Podium: React.FC<PodiumProps> = ({
         requestAnimationFrame(frame);
       }
     })();
+
+    const timer = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          onReturnToLobby();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
   }, []);
 
   const sortedResults = [...results].sort((a, b) => {
@@ -64,10 +78,6 @@ export const Podium: React.FC<PodiumProps> = ({
     return b.progress - a.progress;
   });
 
-  const winner = sortedResults[0];
-  const second = sortedResults[1];
-  const third = sortedResults[2];
-
   useEffect(() => {
     const container = mountRef.current;
     if (!container) return;
@@ -76,19 +86,19 @@ export const Podium: React.FC<PodiumProps> = ({
     const height = container.clientHeight || window.innerHeight;
 
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x050811);
-    scene.fog = new THREE.FogExp2(0x050811, 0.015);
+    scene.background = new THREE.Color(0x1e293b); // Bright stadium background, not pitch black
+    scene.fog = new THREE.FogExp2(0x1e293b, 0.008);
 
     const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 100);
-    camera.position.set(0, 3.5, 9.0);
-    camera.lookAt(0, 1.2, 0);
+    camera.position.set(0, 3.5, 9.5);
+    camera.lookAt(0, 1.0, 0);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
     renderer.setSize(width, height);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.3;
+    renderer.toneMappingExposure = 1.4;
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     container.appendChild(renderer.domElement);
@@ -97,94 +107,68 @@ export const Podium: React.FC<PodiumProps> = ({
     scene.environment = pmremGenerator.fromScene(new RoomEnvironment(), 0.04).texture;
     pmremGenerator.dispose();
 
-    const ambientLight = new THREE.HemisphereLight(0x38bdf8, 0x050811, 1.2);
+    const ambientLight = new THREE.HemisphereLight(0xffffff, 0x1e293b, 1.5);
     scene.add(ambientLight);
 
-    const spotGold = new THREE.SpotLight(0xfacc15, 4.5, 30, Math.PI / 4, 0.5);
-    spotGold.position.set(0, 10, 5);
-    spotGold.castShadow = true;
-    scene.add(spotGold);
+    const dirLight = new THREE.DirectionalLight(0xffffff, 3.0);
+    dirLight.position.set(10, 20, 10);
+    dirLight.castShadow = true;
+    scene.add(dirLight);
 
-    // Podium Pedestals
-    const pedestalMat = new THREE.MeshStandardMaterial({
-      color: 0x1e293b,
+    // Stadium ground platform
+    const groundGeom = new THREE.PlaneGeometry(100, 100);
+    const groundMat = new THREE.MeshStandardMaterial({
+      color: 0x0f172a,
       metalness: 0.85,
       roughness: 0.2,
     });
+    const ground = new THREE.Mesh(groundGeom, groundMat);
+    ground.rotation.x = -Math.PI / 2;
+    ground.receiveShadow = true;
+    scene.add(ground);
 
-    // 1st Place (Center)
-    const p1Geom = new THREE.BoxGeometry(2.4, 2.2, 2.4);
-    const p1Mesh = new THREE.Mesh(p1Geom, pedestalMat);
-    p1Mesh.position.set(0, 1.1, 0);
-    p1Mesh.receiveShadow = true;
-    scene.add(p1Mesh);
-
-    // 2nd Place (Left)
-    const p2Geom = new THREE.BoxGeometry(2.2, 1.5, 2.2);
-    const p2Mesh = new THREE.Mesh(p2Geom, pedestalMat);
-    p2Mesh.position.set(-2.8, 0.75, -0.5);
-    p2Mesh.receiveShadow = true;
-    scene.add(p2Mesh);
-
-    // 3rd Place (Right)
-    const p3Geom = new THREE.BoxGeometry(2.2, 0.9, 2.2);
-    const p3Mesh = new THREE.Mesh(p3Geom, pedestalMat);
-    p3Mesh.position.set(2.8, 0.45, -0.5);
-    p3Mesh.receiveShadow = true;
-    scene.add(p3Mesh);
-
+    // Arrange cars symmetrically: 1st place in center-front, others arrayed outward on both sides with decreasing rank
     const carGroups: THREE.Group[] = [];
+    const n = sortedResults.length;
 
-    if (winner) {
+    sortedResults.forEach((res, index) => {
       const custom: CarCustomization = {
-        model: winner.carModel || 'sport',
-        color: winner.carColor || '#facc15',
-        accentColor: winner.accentColor || '#ffffff',
-        neonColor: winner.neonColor || '#facc15',
+        model: res.carModel || 'sport',
+        color: res.carColor || '#ef4444',
+        accentColor: res.accentColor || '#ffffff',
+        neonColor: res.neonColor || '#06b6d4',
       };
       const v = buildProceduralCar(custom);
-      v.group.position.set(0, 2.2, 0);
+
+      // Symmetrical V-shape / Arc placement:
+      // Index 0 (1st place) is dead center in front.
+      // Index 1 (2nd), Index 2 (3rd), etc. placed symmetrically left and right.
+      let x = 0;
+      let z = 0;
+      if (index === 0) {
+        x = 0;
+        z = 0; // Front & Center
+      } else {
+        const side = index % 2 === 1 ? 1 : -1;
+        const rankPair = Math.ceil(index / 2);
+        x = side * rankPair * 2.2;
+        z = -rankPair * 1.2; // slightly behind 1st place
+      }
+
+      v.group.position.set(x, 0, z);
+      v.group.rotation.y = 0.25;
       v.group.scale.set(0.9, 0.9, 0.9);
       scene.add(v.group);
       carGroups.push(v.group);
-    }
-
-    if (second) {
-      const custom: CarCustomization = {
-        model: second.carModel || 'sport',
-        color: second.carColor || '#94a3b8',
-        accentColor: second.accentColor || '#ffffff',
-        neonColor: second.neonColor || '#38bdf8',
-      };
-      const v = buildProceduralCar(custom);
-      v.group.position.set(-2.8, 1.5, -0.5);
-      v.group.scale.set(0.85, 0.85, 0.85);
-      scene.add(v.group);
-      carGroups.push(v.group);
-    }
-
-    if (third) {
-      const custom: CarCustomization = {
-        model: third.carModel || 'sport',
-        color: third.carColor || '#b45309',
-        accentColor: third.accentColor || '#ffffff',
-        neonColor: third.neonColor || '#f97316',
-      };
-      const v = buildProceduralCar(custom);
-      v.group.position.set(2.8, 0.9, -0.5);
-      v.group.scale.set(0.85, 0.85, 0.85);
-      scene.add(v.group);
-      carGroups.push(v.group);
-    }
+    });
 
     const clock = new THREE.Clock();
     const animate = () => {
       animFrameRef.current = requestAnimationFrame(animate);
-      const delta = clock.getDelta();
       const time = clock.getElapsedTime();
 
       carGroups.forEach((g, idx) => {
-        g.rotation.y = time * 0.5 + idx * 2.0;
+        g.position.y = Math.sin(time * 2.5 + idx) * 0.025;
       });
 
       renderer.render(scene, camera);
@@ -213,7 +197,7 @@ export const Podium: React.FC<PodiumProps> = ({
   }, [results]);
 
   const formatTime = (ms: number) => {
-    if (!ms) return '--:--';
+    if (!ms) return 'DNF';
     const totalSec = Math.floor(ms / 1000);
     const minutes = Math.floor(totalSec / 60);
     const seconds = totalSec % 60;
@@ -222,44 +206,39 @@ export const Podium: React.FC<PodiumProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950 flex flex-col justify-between p-4 md:p-6 overflow-y-auto select-none">
-      {/* 3D Podium Canvas Background */}
-      <div ref={mountRef} className="absolute inset-0 w-full h-full pointer-events-none z-0" />
+    <div className="fixed inset-0 z-50 bg-transparent flex flex-col justify-between p-4 md:p-6 overflow-y-auto select-none pointer-events-none">
+      {/* 3D Stadium Car Showcase Lineup Background */}
+      <div ref={mountRef} className="absolute inset-0 w-full h-full pointer-events-auto z-0" />
 
-      {/* Top Header */}
-      <div className="relative z-10 text-center mt-2 pointer-events-auto">
-        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-gradient-to-r from-amber-500/20 via-yellow-400/20 to-amber-500/20 border border-amber-400/50 text-amber-300 font-black text-xs md:text-sm tracking-widest uppercase mb-1.5 shadow-2xl backdrop-blur-md">
-          <Award size={16} className="text-amber-400" />
-          VICTORY CEREMONY
-        </div>
-        <h1 className="text-3xl md:text-5xl font-black text-white italic tracking-tight drop-shadow-[0_0_20px_rgba(250,204,21,0.5)]">
-          챔피언 시상대 (PODIUM)
+      {/* Top Banner */}
+      <div className="relative z-10 flex flex-col items-center mt-2 pointer-events-auto">
+        <h1 className="text-3xl md:text-5xl font-black text-white italic tracking-tight drop-shadow-[0_0_25px_rgba(6,182,212,0.9)]">
+          🏆 최종 순위 & 쇼룸 라인업
         </h1>
       </div>
 
-      {/* Center 3D Showcase Area (transparent overlay for layout) */}
-      <div className="relative z-10 flex-grow pointer-events-none min-h-[220px]" />
+      <div className="relative z-10 flex-grow pointer-events-none min-h-[160px]" />
 
-      {/* Bottom Info & Buttons */}
-      <div className="relative z-10 flex flex-col items-center gap-4 w-full max-w-xl mx-auto pointer-events-auto">
-        <div className="w-full bg-slate-900/90 border border-cyan-500/40 rounded-2xl p-4 shadow-2xl backdrop-blur-xl max-h-44 overflow-y-auto">
-          <h4 className="text-xs font-bold text-cyan-400 uppercase tracking-wider mb-2.5 flex items-center justify-between">
+      {/* Bottom Info & 10s Countdown Notice */}
+      <div className="relative z-10 flex flex-col items-center gap-3 w-full max-w-xl mx-auto pointer-events-auto">
+        <div className="w-full bg-slate-950/80 border border-cyan-500/40 rounded-2xl p-3 shadow-2xl backdrop-blur-md max-h-36 overflow-y-auto">
+          <h4 className="text-xs font-bold text-cyan-400 uppercase tracking-wider mb-2 flex items-center justify-between">
             <span className="flex items-center gap-1.5">
-              <Flag size={13} className="text-cyan-400" /> 최종 순위 결과
+              <Flag size={13} className="text-cyan-400" /> 최종 순위 (진행도 기준)
             </span>
-            <span className="text-[10px] text-slate-400">총 {sortedResults.length}명 완주</span>
+            <span className="text-[10px] text-slate-400">총 {sortedResults.length}명</span>
           </h4>
-          <div className="space-y-1.5">
+          <div className="space-y-1">
             {sortedResults.map((player, idx) => (
               <div
                 key={player.id}
-                className={`flex items-center justify-between p-2 rounded-xl border text-xs ${
+                className={`flex items-center justify-between p-1.5 rounded-xl border text-xs ${
                   player.id === currentPlayerId
                     ? 'bg-cyan-500/30 border-cyan-400 text-cyan-200 font-bold shadow-[0_0_10px_rgba(6,182,212,0.3)]'
-                    : 'bg-slate-800/60 border-slate-700/60 text-slate-300'
+                    : 'bg-slate-900/60 border-slate-800 text-slate-300'
                 }`}
               >
-                <div className="flex items-center gap-2.5">
+                <div className="flex items-center gap-2">
                   <span className="w-5 text-center font-mono font-bold text-amber-400">
                     {idx + 1}
                   </span>
@@ -267,33 +246,38 @@ export const Podium: React.FC<PodiumProps> = ({
                     className="w-3 h-3 rounded-full border border-white/40 shadow-sm"
                     style={{ backgroundColor: player.carColor }}
                   />
-                  <span className="truncate max-w-[140px] md:max-w-[220px]">{player.name}</span>
+                  <span className="truncate max-w-[130px] md:max-w-[200px]">{player.name}</span>
                   {player.id === currentPlayerId && (
-                    <span className="text-[9px] px-1.5 rounded bg-cyan-500/20 text-cyan-300">YOU</span>
+                    <span className="text-[9px] px-1 rounded bg-cyan-500/20 text-cyan-300">YOU</span>
                   )}
                 </div>
                 <div className="flex items-center gap-1 font-mono text-[11px] text-slate-300">
                   <Clock size={11} className="text-cyan-400" />
-                  <span>{player.finished ? formatTime(player.finishTime) : '완주'}</span>
+                  <span>{player.finished ? formatTime(player.finishTime) : `Lap ${Math.floor(player.progress || 1)}`}</span>
                 </div>
               </div>
             ))}
           </div>
         </div>
 
+        {/* 10 seconds exit notice banner */}
+        <div className="w-full bg-cyan-500/90 text-slate-950 font-black px-6 py-2.5 rounded-2xl shadow-2xl text-center text-sm md:text-base border border-cyan-300 animate-pulse">
+          ⏳ 10초 뒤에 로비로 나가집니다 ({countdown}초)
+        </div>
+
         <div className="flex items-center gap-3 w-full justify-center">
           <button
             onClick={onReturnToLobby}
-            className="flex-1 py-3.5 rounded-2xl bg-slate-800 hover:bg-slate-700 border border-slate-600 text-white font-bold text-sm flex items-center justify-center gap-2 transition-all hover:scale-105 active:scale-95 shadow-xl"
+            className="flex-1 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-white font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-lg"
           >
-            <ArrowRight size={16} /> 로비로 나가기
+            <ArrowRight size={14} /> 로비로 즉시 나가기
           </button>
           {isHost && (
             <button
               onClick={onRematch}
-              className="flex-1 py-3.5 rounded-2xl bg-gradient-to-r from-cyan-500 to-sky-400 hover:from-cyan-400 hover:to-sky-300 text-slate-950 font-black text-sm flex items-center justify-center gap-2 transition-all hover:scale-105 active:scale-95 shadow-xl shadow-cyan-500/40"
+              className="flex-1 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black text-xs flex items-center justify-center gap-2 transition-all shadow-xl"
             >
-              <RotateCcw size={16} /> 재경기 (Rematch)
+              <RotateCcw size={14} /> 재경기
             </button>
           )}
         </div>

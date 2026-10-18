@@ -181,6 +181,8 @@ export default function App() {
   }, []);
 
   const handleQuickStart = (trackId: TrackId, customization: CarCustomization, riderName: string) => {
+    finishCountdownStartedRef.current = false;
+    setFinishCountdownNotice(null);
     const myId = `player_${Math.random().toString(36).substring(2, 7)}`;
     const player: PlayerInfo = {
       id: myId,
@@ -334,9 +336,13 @@ export default function App() {
     }
   };
 
+  const finishCountdownStartedRef = useRef(false);
+
   const handleStartRace = () => {
     sound.init();
     sound.resume();
+    finishCountdownStartedRef.current = false;
+    setFinishCountdownNotice(null);
     if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
       socketRef.current.send(JSON.stringify({ type: 'start_race' }));
     } else {
@@ -358,7 +364,7 @@ export default function App() {
     }
   };
 
-  const handleFinishRace = (finishTime: number, customResults?: PlayerInfo[]) => {
+  const handleFinishRace = (finishTime: number) => {
     if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
       socketRef.current.send(
         JSON.stringify({
@@ -366,14 +372,92 @@ export default function App() {
           finishTime,
         })
       );
-    } else {
-      if (currentPlayer) {
-        const finishedPlayer = { ...currentPlayer, finished: true, finishTime, place: 1 };
-        const results = customResults && customResults.length > 0 ? customResults : [finishedPlayer];
-        setRaceResults(results);
-        setRoomState((prev) => (prev ? { ...prev, state: 'finished' } : null));
-      }
     }
+
+    if (currentPlayer && !finishCountdownStartedRef.current) {
+      finishCountdownStartedRef.current = true;
+      let leftSec = 10;
+      setFinishCountdownNotice(`🏆 선두 결승선 통과! 10초 후 경기 종료 및 순위 산출 (${leftSec}초)`);
+      sound.playVictoryFanfare();
+
+        const timer = setInterval(() => {
+          leftSec--;
+          if (leftSec <= 0) {
+            clearInterval(timer);
+            setFinishCountdownNotice(null);
+
+            const allRacers = [
+              {
+                id: currentPlayer.id,
+                name: currentPlayer.name,
+                carModel: currentPlayer.carModel,
+                carColor: currentPlayer.carColor,
+                accentColor: currentPlayer.accentColor,
+                neonColor: currentPlayer.neonColor,
+                lap: vehicleState?.currentLap || 1,
+                progress: vehicleState?.totalProgress || 0,
+                finished: vehicleState?.isFinished || false,
+                time: vehicleState?.finishTime || Date.now(),
+              },
+              ...bots.map((b) => ({
+                id: b.id,
+                name: b.name,
+                carModel: b.carModel,
+                carColor: b.carColor,
+                accentColor: b.accentColor,
+                neonColor: b.neonColor,
+                lap: b.lap,
+                progress: b.totalProgress,
+                finished: b.isFinished,
+                time: b.finishTime || Date.now(),
+              })),
+              ...Array.from(peerPlayersMap.values()).map((p) => ({
+                id: p.id,
+                name: p.name,
+                carModel: p.carModel,
+                carColor: p.carColor,
+                accentColor: p.accentColor,
+                neonColor: p.neonColor,
+                lap: p.lap,
+                progress: p.progress,
+                finished: p.finished,
+                time: p.finishTime || Date.now(),
+              })),
+            ];
+
+            allRacers.sort((a, b) => {
+              if (a.finished && b.finished) return a.time - b.time;
+              if (a.finished) return -1;
+              if (b.finished) return 1;
+              if (a.lap !== b.lap) return b.lap - a.lap;
+              return b.progress - a.progress;
+            });
+
+            const finalResults: PlayerInfo[] = allRacers.map((r, idx) => ({
+              id: r.id,
+              name: r.name,
+              carModel: r.carModel,
+              carColor: r.carColor,
+              accentColor: r.accentColor,
+              neonColor: r.neonColor,
+              isHost: r.id === currentPlayer.id,
+              isReady: true,
+              team: 'none',
+              lap: r.lap,
+              checkpoint: 0,
+              progress: r.progress,
+              finished: r.finished,
+              finishTime: r.time,
+              place: idx + 1,
+            }));
+
+            setRaceResults(finalResults);
+            setRoomState((prev) => (prev ? { ...prev, state: 'finished' } : null));
+          } else {
+            setFinishCountdownNotice(`🏆 선두 결승선 통과! 10초 후 경기 종료 및 순위 산출 (${leftSec}초)`);
+          }
+        }, 1000);
+      }
   };
 
   const handleItemUsed = (type: string, position: any) => {
@@ -389,6 +473,18 @@ export default function App() {
   };
 
   const handleSendQuickChat = (emoji: string, text: string) => {
+    const newMsg: ChatMessage = {
+      id: Math.random().toString(),
+      senderName: currentPlayer?.name || '레이서',
+      text,
+      emoji,
+      timestamp: Date.now(),
+    };
+    setChatMessages((prev) => [...prev.slice(-4), newMsg]);
+    setTimeout(() => {
+      setChatMessages((prev) => prev.filter((m) => m.id !== newMsg.id));
+    }, 4000);
+
     if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
       socketRef.current.send(
         JSON.stringify({

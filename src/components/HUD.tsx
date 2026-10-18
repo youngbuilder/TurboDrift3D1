@@ -20,6 +20,7 @@ import {
   Compass,
   Users,
   Move,
+  Smartphone,
 } from 'lucide-react';
 import { sound } from '../game/audio';
 import { BotRacer, VehicleState } from '../game/physics';
@@ -81,8 +82,9 @@ export const HUD: React.FC<HUDProps> = ({
   const [showForfeitModal, setShowForfeitModal] = useState(false);
   const [showPlayerList, setShowPlayerList] = useState(false);
   const [isMapHidden, setIsMapHidden] = useState(false);
+  const [showMobileControls, setShowMobileControls] = useState(true);
 
-  // Free draggable UI offset for minimap/leaderboard
+  // Draggable minimap
   const [minimapOffset, setMinimapOffset] = useState({ x: 0, y: 0 });
   const [isDraggingMinimap, setIsDraggingMinimap] = useState(false);
   const dragStartRef = useRef({ x: 0, y: 0 });
@@ -152,7 +154,8 @@ export const HUD: React.FC<HUDProps> = ({
       className="absolute inset-0 pointer-events-none select-none overflow-hidden flex flex-col justify-between p-3 md:p-6"
       onKeyDown={(e) => e.stopPropagation()}
     >
-      <div className="flex items-start justify-between w-full pointer-events-auto gap-2">
+      {/* LAYER 3 (z-30): Lap / Rank Badge */}
+      <div className="flex items-start justify-between w-full pointer-events-auto gap-2 z-30">
         <div className="flex items-center gap-2 md:gap-3 flex-wrap">
           <div className={`${isDarkMode ? 'bg-slate-900/90' : 'bg-white'} border ${isDarkMode ? 'border-cyan-500/40' : 'border-cyan-300/40'} rounded-xl px-3 py-1.5 shadow-lg backdrop-blur-md`}>
             <div className="flex items-center gap-2">
@@ -169,7 +172,7 @@ export const HUD: React.FC<HUDProps> = ({
 
           <button
             onClick={() => setShowPlayerList(!showPlayerList)}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-cyan-500/40 text-cyan-300 text-xs font-bold shadow-lg backdrop-blur-md transition-all"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-cyan-500/40 text-cyan-300 text-xs font-bold shadow-lg backdrop-blur-md transition-all cursor-pointer"
             title="레이서 순위"
           >
             <Users size={14} />
@@ -178,28 +181,25 @@ export const HUD: React.FC<HUDProps> = ({
 
           <button
             onClick={() => setIsMapHidden(!isMapHidden)}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-cyan-500/40 text-cyan-300 text-xs font-bold shadow-lg backdrop-blur-md transition-all"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-cyan-500/40 text-cyan-300 text-xs font-bold shadow-lg backdrop-blur-md transition-all cursor-pointer"
             title="미니맵 토글"
           >
             <Compass size={14} />
             <span>{isMapHidden ? '미니맵 켜기' : '미니맵 숨기기'}</span>
           </button>
 
-          {playerTeam !== 'none' && (
-            <div
-              className={`px-3 py-1.5 rounded-xl border font-bold text-xs shadow-md backdrop-blur-md flex items-center gap-1.5 ${
-                playerTeam === 'red'
-                  ? 'bg-rose-950/80 border-rose-500 text-rose-300'
-                  : 'bg-blue-950/80 border-blue-500 text-blue-300'
-              }`}
-            >
-              <span>팀: {playerTeam === 'red' ? '레드 팀' : '블루 팀'}</span>
-            </div>
-          )}
+          <button
+            onClick={() => setShowMobileControls(!showMobileControls)}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-cyan-500/40 text-cyan-300 text-xs font-bold shadow-lg backdrop-blur-md transition-all cursor-pointer"
+            title="모바일 버튼 숨기기/보이기"
+          >
+            <Smartphone size={14} />
+            <span>{showMobileControls ? '모바일 버튼 숨기기' : '모바일 버튼 보이기'}</span>
+          </button>
 
           <button
             onClick={() => setShowForfeitModal(true)}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl ${isDarkMode ? 'bg-slate-900/90 hover:bg-rose-950/80 border-slate-700 hover:border-rose-600 text-slate-300 hover:text-rose-200' : 'bg-white hover:bg-rose-100 border-slate-300 hover:border-rose-300 text-slate-700 hover:text-rose-700'} text-xs font-bold shadow-lg transition-all active:scale-95`}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl ${isDarkMode ? 'bg-slate-900/90 hover:bg-rose-950/80 border-slate-700 hover:border-rose-600 text-slate-300 hover:text-rose-200' : 'bg-white hover:bg-rose-100 border-slate-300 hover:border-rose-300 text-slate-700 hover:text-rose-700'} text-xs font-bold shadow-lg transition-all active:scale-95 cursor-pointer`}
             title="포기하고 나가기"
           >
             <LogOut size={13} className="text-rose-500" />
@@ -212,12 +212,14 @@ export const HUD: React.FC<HUDProps> = ({
             </div>
           )}
 
-          <div className="hidden sm:flex items-center gap-1 bg-slate-900/80 border border-slate-700/60 rounded-xl p-1 backdrop-blur-md">
+          {/* Quick Chat Emoji Bar */}
+          <div className="flex items-center gap-1 bg-slate-900/90 border border-slate-700/80 rounded-xl p-1.5 backdrop-blur-md pointer-events-auto shadow-xl">
             {['🔥', '👍', '😎', '🎉'].map((emoji) => (
               <button
                 key={emoji}
                 onClick={() => onSendQuickChat(emoji, emoji)}
-                className="w-7 h-7 rounded-lg bg-slate-800 hover:bg-cyan-500/30 text-xs font-bold flex items-center justify-center transition-all hover:scale-110 active:scale-95"
+                className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-cyan-500/40 text-base font-bold flex items-center justify-center transition-all hover:scale-110 active:scale-95 cursor-pointer shadow-sm"
+                title={emoji}
               >
                 {emoji}
               </button>
@@ -226,12 +228,12 @@ export const HUD: React.FC<HUDProps> = ({
         </div>
 
         <div className="flex items-center gap-2 md:gap-3">
-          <div className="bg-slate-900/90 border border-slate-700/60 rounded-xl px-3 py-1.5 shadow-lg backdrop-blur-md text-right">
+          <div className="bg-slate-900/90 border border-slate-700/60 rounded-xl px-3.5 py-1.5 shadow-lg backdrop-blur-md text-right min-w-[95px]">
             <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider flex items-center justify-end gap-1">
               <Flag size={11} className="text-amber-400" />
               LAP
             </div>
-            <div className="font-black text-white text-base md:text-lg tracking-wider">
+            <div className="font-black text-white text-base md:text-lg tracking-wider whitespace-nowrap">
               {Math.min(currentLap, totalLaps)} <span className="text-slate-500 text-xs">/ {totalLaps}</span>
             </div>
           </div>
@@ -245,15 +247,15 @@ export const HUD: React.FC<HUDProps> = ({
         </div>
       </div>
 
-      {/* Minimap & Permanent Leaderboard (Freely Draggable Anywhere!) */}
+      {/* LAYER 4 (z-25): Minimap & LAYER 5 (z-20): Leaderboard showing Player & AI ranks & laps */}
       <div
-        className={`absolute top-20 right-4 z-30 pointer-events-auto flex flex-col gap-2.5 w-52 transition-opacity duration-300 cursor-move ${isMapHidden ? 'translate-x-60 opacity-0 pointer-events-none' : 'translate-x-0 opacity-100'}`}
+        className={`absolute top-20 right-4 z-20 pointer-events-auto flex flex-col gap-2.5 w-56 transition-opacity duration-300 cursor-move ${isMapHidden ? 'translate-x-60 opacity-0 pointer-events-none' : 'translate-x-0 opacity-100'}`}
         style={{ transform: `translate(${minimapOffset.x}px, ${minimapOffset.y}px)` }}
         onPointerDown={handleMinimapPointerDown}
         onPointerMove={handleMinimapPointerMove}
         onPointerUp={handleMinimapPointerUp}
       >
-        <div className="bg-slate-950/90 border border-cyan-500/40 rounded-2xl p-2.5 backdrop-blur-md w-full h-36 flex flex-col items-center justify-center relative shadow-xl">
+        <div className="bg-slate-950/90 border border-cyan-500/40 rounded-2xl p-2.5 backdrop-blur-md w-full h-36 flex flex-col items-center justify-center relative shadow-xl z-20">
           <div className="absolute top-1 left-2 text-[9px] font-bold text-cyan-400 flex items-center gap-1">
             <Compass size={11} /> 서킷 미니맵 <Move size={10} className="ml-1 opacity-70" />
           </div>
@@ -261,7 +263,6 @@ export const HUD: React.FC<HUDProps> = ({
             <svg className="absolute inset-0 w-full h-full opacity-70" viewBox="0 0 100 100">
               <circle cx="50" cy="50" r="38" fill="none" stroke="#06b6d4" strokeWidth="4" strokeDasharray="6 4" />
             </svg>
-            {/* Player position */}
             {(() => {
               const t = (vehicleState?.trackT || 0) % 1;
               const angle = t * Math.PI * 2 - Math.PI / 2;
@@ -273,7 +274,6 @@ export const HUD: React.FC<HUDProps> = ({
                 />
               ) as React.ReactNode;
             })()}
-            {/* AI Bots positions */}
             {bots.map((b) => {
               const t = (b.trackT || 0) % 1;
               const angle = t * Math.PI * 2 - Math.PI / 2;
@@ -286,7 +286,6 @@ export const HUD: React.FC<HUDProps> = ({
                 />
               );
             })}
-            {/* Peer players positions */}
             {Array.from(peerPlayers.values()).map((p) => {
               const t = (p.progress || 0) % 1;
               const angle = t * Math.PI * 2 - Math.PI / 2;
@@ -302,28 +301,43 @@ export const HUD: React.FC<HUDProps> = ({
           </div>
         </div>
 
-        <div className="bg-slate-950/95 border border-cyan-500/50 rounded-2xl p-3 backdrop-blur-xl w-full shadow-2xl">
+        {/* Real-time Leaderboard showing Player & AI ranks and laps precisely */}
+        <div className="bg-slate-950/95 border border-cyan-500/50 rounded-2xl p-3 backdrop-blur-xl w-full shadow-2xl z-10">
           <div className="flex justify-between items-center mb-2 pb-1 border-b border-slate-800 text-xs font-bold text-cyan-400">
-            <span>실시간 순위</span>
+            <span>실시간 순위 (Player & AI)</span>
             <span>LAP {currentLap}/{totalLaps}</span>
           </div>
-          <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1 text-xs">
-            <div className="flex justify-between items-center px-2 py-1 rounded bg-cyan-500/20 text-cyan-200 font-bold border border-cyan-500/30">
-              <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-cyan-400" /> 1. {playerInfo.name} (나)</span>
-              <span>{rank}위</span>
-            </div>
-            {Array.from(peerPlayers.values()).map((p, idx) => (
-              <div key={p.id} className="flex justify-between items-center px-2 py-1 rounded bg-slate-900 text-slate-300">
-                <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-purple-400" /> {idx + 2}. {p.name}</span>
-                <span>Lap {p.lap}</span>
-              </div>
-            ))}
-            {bots.map((bot, idx) => (
-              <div key={bot.id} className="flex justify-between items-center px-2 py-1 rounded bg-slate-900/80 text-slate-400">
-                <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-rose-500" /> {peerPlayers.size + idx + 2}. {bot.name}</span>
-                <span>Lap {bot.lap}</span>
-              </div>
-            ))}
+          <div className="space-y-1.5 max-h-44 overflow-y-auto pr-1 text-xs">
+            {/* Combine player, peers, and bots into sorted leaderboard */}
+            {(() => {
+              const allRacersList = [
+                { id: playerInfo.id, name: playerInfo.name, isPlayer: true, lap: currentLap, progress: vehicleState?.totalProgress || 0 },
+                ...bots.map(b => ({ id: b.id, name: b.name, isPlayer: false, lap: b.lap, progress: b.totalProgress })),
+                ...Array.from(peerPlayers.values()).map(p => ({ id: p.id, name: p.name, isPlayer: false, lap: p.lap, progress: p.progress })),
+              ];
+
+              allRacersList.sort((a, b) => {
+                if (a.lap !== b.lap) return b.lap - a.lap; // Strict lap priority
+                return b.progress - a.progress;
+              });
+
+              return allRacersList.map((racer, index) => (
+                <div
+                  key={racer.id}
+                  className={`flex justify-between items-center px-2.5 py-1.5 rounded-lg border ${
+                    racer.isPlayer
+                      ? 'bg-cyan-500/25 text-cyan-200 font-bold border-cyan-500/50'
+                      : 'bg-slate-900/90 text-slate-300 border-slate-800'
+                  }`}
+                >
+                  <span className="flex items-center gap-2 truncate">
+                    <span className={`w-2 h-2 rounded-full ${racer.isPlayer ? 'bg-cyan-400 shadow-[0_0_8px_#06b6d4]' : 'bg-rose-500'}`} />
+                    <span>{index + 1}. {racer.name}</span>
+                  </span>
+                  <span className="font-mono font-semibold text-amber-400">Lap {racer.lap}/{totalLaps}</span>
+                </div>
+              ));
+            })()}
           </div>
         </div>
       </div>
@@ -350,15 +364,16 @@ export const HUD: React.FC<HUDProps> = ({
         )}
       </div>
 
-      {!isFinished && (
-        <div className="flex justify-between items-end w-full pointer-events-auto pb-12 px-2">
+      {/* LAYER 1 (z-50): 조작 (Touch / Steering Controls) */}
+      {!isFinished && showMobileControls && (
+        <div className="flex justify-between items-end w-full pointer-events-auto pb-12 px-2 z-50">
           <div className="flex gap-3 bg-slate-950/40 p-2.5 rounded-3xl backdrop-blur-md border border-cyan-500/20 shadow-lg">
             <button
               onPointerDown={() => updateTouch('left', true)}
               onPointerUp={() => updateTouch('left', false)}
               onPointerCancel={() => updateTouch('left', false)}
               onPointerLeave={() => updateTouch('left', false)}
-              className={`w-14 h-14 rounded-2xl font-black text-lg shadow-md transition-all ${
+              className={`w-14 h-14 rounded-2xl font-black text-lg shadow-md transition-all cursor-pointer ${
                 touchState.left ? 'bg-cyan-500 text-white scale-95 shadow-cyan-500/50' : 'bg-slate-900/50 text-cyan-300 border border-cyan-500/30'
               }`}
             >
@@ -369,7 +384,7 @@ export const HUD: React.FC<HUDProps> = ({
               onPointerUp={() => updateTouch('right', false)}
               onPointerCancel={() => updateTouch('right', false)}
               onPointerLeave={() => updateTouch('right', false)}
-              className={`w-14 h-14 rounded-2xl font-black text-lg shadow-md transition-all ${
+              className={`w-14 h-14 rounded-2xl font-black text-lg shadow-md transition-all cursor-pointer ${
                 touchState.right ? 'bg-cyan-500 text-white scale-95 shadow-cyan-500/50' : 'bg-slate-900/50 text-cyan-300 border border-cyan-500/30'
               }`}
             >
@@ -381,7 +396,7 @@ export const HUD: React.FC<HUDProps> = ({
             {currentItem && (
               <button
                 onClick={onUseItem}
-                className="w-16 h-12 rounded-2xl bg-amber-500/80 active:scale-95 text-white font-black text-xs flex items-center justify-center shadow-lg backdrop-blur-md border border-amber-400/40"
+                className="w-16 h-12 rounded-2xl bg-amber-500/80 active:scale-95 text-white font-black text-xs flex items-center justify-center shadow-lg backdrop-blur-md border border-amber-400/40 cursor-pointer"
               >
                 {getItemLabel(currentItem).icon} 사용
               </button>
@@ -392,7 +407,7 @@ export const HUD: React.FC<HUDProps> = ({
                 onPointerUp={() => updateTouch('drift', false)}
                 onPointerCancel={() => updateTouch('drift', false)}
                 onPointerLeave={() => updateTouch('drift', false)}
-                className={`w-14 h-14 rounded-2xl font-black text-xs shadow-md transition-all ${
+                className={`w-14 h-14 rounded-2xl font-black text-xs shadow-md transition-all cursor-pointer ${
                   touchState.drift ? 'bg-purple-600 text-white scale-95 shadow-purple-500/50' : 'bg-slate-900/50 text-purple-300 border border-purple-500/30'
                 }`}
               >
@@ -403,7 +418,7 @@ export const HUD: React.FC<HUDProps> = ({
                 onPointerUp={() => updateTouch('backward', false)}
                 onPointerCancel={() => updateTouch('backward', false)}
                 onPointerLeave={() => updateTouch('backward', false)}
-                className={`w-14 h-14 rounded-2xl font-black text-xs shadow-md transition-all ${
+                className={`w-14 h-14 rounded-2xl font-black text-xs shadow-md transition-all cursor-pointer ${
                   touchState.backward ? 'bg-rose-600 text-white scale-95 shadow-rose-500/50' : 'bg-slate-900/50 text-rose-300 border border-rose-500/30'
                 }`}
               >
@@ -414,7 +429,7 @@ export const HUD: React.FC<HUDProps> = ({
                 onPointerUp={() => updateTouch('forward', false)}
                 onPointerCancel={() => updateTouch('forward', false)}
                 onPointerLeave={() => updateTouch('forward', false)}
-                className={`w-14 h-14 rounded-2xl font-black text-xs shadow-md transition-all ${
+                className={`w-14 h-14 rounded-2xl font-black text-xs shadow-md transition-all cursor-pointer ${
                   touchState.forward ? 'bg-cyan-500 text-white scale-95 shadow-cyan-500/50' : 'bg-slate-900/50 text-cyan-300 border border-cyan-500/30'
                 }`}
               >
@@ -425,10 +440,11 @@ export const HUD: React.FC<HUDProps> = ({
         </div>
       )}
 
-      <div className="self-center pointer-events-auto flex flex-col items-center max-w-[940px] w-full">
+      {/* LAYER 2 (z-40): HUD (Speedometer, Gear, Camera, Sound, Graphics Dock - Drift gauge & items neatly inside) */}
+      <div className="self-center pointer-events-auto flex flex-col items-center max-w-[940px] w-full z-40">
         <button
           onClick={() => setIsDockCollapsed(!isDockCollapsed)}
-          className="mb-1 px-3 py-1 rounded-full bg-slate-900/85 hover:bg-slate-800 border border-slate-700/70 text-slate-300 hover:text-white text-xs font-semibold backdrop-blur-md flex items-center gap-1.5 transition-all shadow-md"
+          className="mb-1 px-3 py-1 rounded-full bg-slate-900/85 hover:bg-slate-800 border border-slate-700/70 text-slate-300 hover:text-white text-xs font-semibold backdrop-blur-md flex items-center gap-1.5 transition-all shadow-md cursor-pointer"
         >
           {isDockCollapsed ? (
             <>
@@ -438,7 +454,7 @@ export const HUD: React.FC<HUDProps> = ({
           ) : (
             <>
               <ChevronDown size={14} className="text-cyan-400" />
-              <span>HUD 컨트롤 접기</span>
+              <span>HUD 컨트롤 접기 (화면 넓게 보기)</span>
             </>
           )}
         </button>
@@ -467,7 +483,7 @@ export const HUD: React.FC<HUDProps> = ({
               {currentItem ? (
                 <button
                   onClick={onUseItem}
-                  className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-500/80 to-amber-600/80 text-white font-bold text-xs md:text-sm shadow-lg backdrop-blur-sm"
+                  className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-500/80 to-amber-600/80 text-white font-bold text-xs md:text-sm shadow-lg backdrop-blur-sm cursor-pointer"
                 >
                   <span className="text-xl">{getItemLabel(currentItem).icon}</span>
                   <span>{getItemLabel(currentItem).name} 사용 (키: [F])</span>
@@ -497,7 +513,7 @@ export const HUD: React.FC<HUDProps> = ({
             <div className="flex items-center gap-1.5 md:gap-2">
               <button
                 onClick={onCycleCamera}
-                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-black/40 hover:bg-black/60 border border-slate-700/50 text-slate-200 text-xs backdrop-blur-sm transition-colors"
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-black/40 hover:bg-black/60 border border-slate-700/50 text-slate-200 text-xs backdrop-blur-sm transition-colors cursor-pointer"
                 title="카메라 전환: [C]"
               >
                 <Camera size={14} className="text-cyan-400" />
@@ -509,7 +525,7 @@ export const HUD: React.FC<HUDProps> = ({
                   const muted = sound.toggleMute();
                   setIsMuted(muted);
                 }}
-                className={`p-2 rounded-lg border transition-colors ${
+                className={`p-2 rounded-lg border transition-colors cursor-pointer ${
                   isMuted ? 'bg-rose-950/40 border-rose-800 text-rose-400' : 'bg-black/40 border-slate-700 text-slate-200'
                 }`}
                 title="음소거 토글"
@@ -521,7 +537,7 @@ export const HUD: React.FC<HUDProps> = ({
                   const m = sound.toggleMusic();
                   setIsMusicMuted(m);
                 }}
-                className={`p-2 rounded-lg border transition-colors ${
+                className={`p-2 rounded-lg border transition-colors cursor-pointer ${
                   isMusicMuted ? 'bg-black/40 border-slate-800 text-slate-500' : 'bg-cyan-950/40 border-cyan-800 text-cyan-300'
                 }`}
                 title="BGM 토글"
@@ -545,7 +561,7 @@ export const HUD: React.FC<HUDProps> = ({
               {!isFinished && (
                 <button
                   onClick={onResetCar}
-                  className="p-2 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-amber-400 transition-colors"
+                  className="p-2 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-amber-400 transition-colors cursor-pointer"
                   title="차량 위치 리셋: [R]"
                 >
                   <RotateCcw size={14} />
@@ -567,7 +583,7 @@ export const HUD: React.FC<HUDProps> = ({
             <div className="flex gap-2.5">
               <button
                 onClick={() => setShowForfeitModal(false)}
-                className="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs"
+                className="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs cursor-pointer"
               >
                 계속 하기
               </button>
@@ -576,7 +592,7 @@ export const HUD: React.FC<HUDProps> = ({
                   setShowForfeitModal(false);
                   onForfeit();
                 }}
-                className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-black text-xs"
+                className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-black text-xs cursor-pointer"
               >
                 포기하기
               </button>

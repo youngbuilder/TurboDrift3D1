@@ -69,6 +69,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
   const trackRef = useRef<any>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const labelRendererRef = useRef<CSS2DRenderer | null>(null);
+  const finishTriggeredRef = useRef(false);
 
   useEffect(() => {
     if (rendererRef.current) {
@@ -93,12 +94,6 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
   const isRacingRef = useRef<boolean>(isRacing);
   isRacingRef.current = isRacing;
-
-  const [raceStage, setRaceStage] = useState<'racing' | 'finishing' | 'podium' | 'finished'>('racing');
-  const raceStageRef = useRef<'racing' | 'finishing' | 'podium' | 'finished'>('racing');
-  raceStageRef.current = raceStage;
-  const stageTimerRef = useRef<number>(0);
-  const [stageTimer, setStageTimer] = useState<number>(0);
 
   const inputRef = useRef<VehicleInput>({
     forward: false,
@@ -404,8 +399,25 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         }
       });
 
-      if (playerState.isFinished && playerState.finishTime && !playerState.rank) {
-        onFinishRace(playerState.finishTime);
+      const allRacers = [
+        { id: playerInfo.id, name: playerInfo.name, carModel: playerInfo.carModel, carColor: playerInfo.carColor, accentColor: playerInfo.accentColor, neonColor: playerInfo.neonColor, lap: playerState.currentLap, progress: playerState.totalProgress, finished: playerState.isFinished, time: playerState.finishTime },
+        ...bots.map((b) => ({ id: b.id, name: b.name, carModel: b.carModel, carColor: b.carColor, accentColor: b.accentColor, neonColor: b.neonColor, lap: b.lap, progress: b.totalProgress, finished: b.isFinished, time: b.finishTime })),
+        ...Array.from(peerPlayers.values()).map((p) => ({ id: p.id, name: p.name, carModel: p.carModel, carColor: p.carColor, accentColor: p.accentColor, neonColor: p.neonColor, lap: p.lap, progress: p.progress, finished: p.finished, time: p.finishTime })),
+      ];
+
+      allRacers.sort((a, b) => {
+        if (a.finished && b.finished) return a.time - b.time;
+        if (a.finished) return -1;
+        if (b.finished) return 1;
+        if (a.lap !== b.lap) return b.lap - a.lap;
+        return b.progress - a.progress;
+      });
+
+      playerState.rank = allRacers.findIndex((r) => r.id === playerInfo.id) + 1;
+
+      if ((playerState.isFinished || bots.some((b) => b.isFinished)) && !finishTriggeredRef.current) {
+        finishTriggeredRef.current = true;
+        onFinishRace(playerState.finishTime || Date.now());
       }
 
       playerVisuals.group.position.copy(playerState.position);
@@ -496,69 +508,11 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         }
       });
 
-      const allRacers = [
-        { id: playerInfo.id, name: playerInfo.name, carColor: playerInfo.carColor, lap: playerState.currentLap, progress: playerState.totalProgress, finished: playerState.isFinished, time: playerState.finishTime },
-        ...bots.map((b) => ({ id: b.id, name: b.name, carColor: b.carColor, lap: b.lap, progress: b.totalProgress, finished: b.isFinished, time: b.finishTime })),
-        ...Array.from(peerPlayers.values()).map((p) => ({ id: p.id, name: p.name, carColor: p.carColor, lap: p.lap, progress: p.progress, finished: p.finished, time: p.finishTime })),
-      ];
-
-      allRacers.sort((a, b) => {
-        if (a.finished && b.finished) return a.time - b.time;
-        if (a.finished) return -1;
-        if (b.finished) return 1;
-        if (a.lap !== b.lap) return b.lap - a.lap;
-        return b.progress - a.progress;
-      });
-
-      playerState.rank = allRacers.findIndex((r) => r.id === playerInfo.id) + 1;
-
-      allRacers.forEach((racer, index) => {
-        const bot = bots.find(b => b.id === racer.id);
-        if (bot) {
-          bot.rank = index + 1;
-        }
-      });
-
       const currentCamMode = cameraModeRef.current;
       const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(playerState.quaternion);
       const up = new THREE.Vector3(0, 1, 0);
 
-      if (raceStageRef.current === 'racing' && playerState.isFinished) {
-        setRaceStage('finishing');
-        raceStageRef.current = 'finishing';
-        stageTimerRef.current = 6;
-        setStageTimer(6);
-      } else if (raceStageRef.current === 'finishing' && stageTimerRef.current > 0) {
-        stageTimerRef.current = Math.max(0, stageTimerRef.current - delta);
-        setStageTimer(Math.ceil(stageTimerRef.current));
-        if (stageTimerRef.current <= 0) {
-          setRaceStage('podium');
-          raceStageRef.current = 'podium';
-          stageTimerRef.current = 15;
-          setStageTimer(15);
-        }
-      } else if (raceStageRef.current === 'podium' && stageTimerRef.current > 0) {
-        stageTimerRef.current = Math.max(0, stageTimerRef.current - delta);
-        setStageTimer(Math.ceil(stageTimerRef.current));
-        if (stageTimerRef.current <= 0) {
-          onFinishRace(playerState.finishTime, allRacers.map((r, idx) => ({
-            ...playerInfo,
-            id: r.id,
-            name: r.name,
-            carColor: r.carColor,
-            finished: r.finished,
-            finishTime: r.time || (Date.now() - idx * 1000),
-            place: idx + 1,
-          })));
-        }
-      }
-
-      if (playerState.isFinished) {
-        cameraPos.copy(track.startPosition).add(new THREE.Vector3(0, 5, -10));
-        cameraTarget.copy(playerState.position);
-        smoothedCamPos.copy(cameraPos);
-        smoothedCamTarget.copy(cameraTarget);
-      } else if (currentCamMode === 1) {
+      if (currentCamMode === 1) {
         const hoodPos = playerState.position.clone().addScaledVector(forward, 0.3).addScaledVector(up, 0.85);
         cameraPos.copy(hoodPos);
         cameraTarget.copy(hoodPos).addScaledVector(forward, 25.0).addScaledVector(up, 0.4);
@@ -626,27 +580,6 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
   return (
     <div className="relative w-full h-full select-none overflow-hidden bg-black flex items-center justify-center">
       <div ref={mountRef} className="w-full h-full min-h-[400px]" />
-      {raceStage === 'finishing' && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black/50 text-white text-4xl font-bold">
-          완주 완료! 다른 레이서들을 기다리는 중... {Math.ceil(stageTimer)}s
-        </div>
-      )}
-      {raceStage === 'podium' && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 text-white">
-          <h1 className="text-6xl font-bold mb-8">레이스 종료!</h1>
-          <div className="text-2xl mb-8">시상대로 이동 중... {Math.ceil(stageTimer)}s</div>
-          <button
-            onClick={() => {
-              if (playerStateRef.current) {
-                onFinishRace(playerStateRef.current.finishTime);
-              }
-            }}
-            className="px-6 py-3 bg-cyan-500 text-slate-950 font-black rounded-xl text-xl hover:bg-cyan-400"
-          >
-            결과 보기
-          </button>
-        </div>
-      )}
     </div>
   );
 };
