@@ -46,7 +46,13 @@ interface LobbyProps {
   onUpdateProfile: (name: string, customization: CarCustomization, isReady: boolean, team: any) => void;
   onUpdateSettings: (trackId: TrackId, laps: number, bots: number, gameMode: GameMode, aiDifficulty: AIDifficulty) => void;
   onStartRace: () => void;
-  onQuickStart: (trackId: TrackId, customization: CarCustomization, nickname: string) => void;
+  onQuickStart: (
+    trackId: TrackId,
+    customization: CarCustomization,
+    nickname: string,
+    botsCount?: number,
+    difficulty?: AIDifficulty
+  ) => void;
   onCreateRoom: (
     roomName: string,
     trackId: TrackId,
@@ -329,7 +335,7 @@ export const Lobby: React.FC<LobbyProps> = ({
                   sound.init();
                   sound.resume();
                   sound.startMusic();
-                  onQuickStart(selectedTrack, customization, nickname);
+                  onQuickStart(selectedTrack, customization, nickname, aiBotsCount, aiDifficulty);
                 }}
                 className="w-full py-4 rounded-2xl bg-gradient-to-r from-emerald-500 via-cyan-500 to-sky-400 hover:from-emerald-400 hover:to-sky-300 text-slate-950 font-black text-lg italic tracking-wider flex items-center justify-center gap-2 shadow-xl shadow-cyan-500/30 transition-all hover:scale-[1.01]"
               >

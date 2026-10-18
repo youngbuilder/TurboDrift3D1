@@ -108,6 +108,15 @@ export const HUD: React.FC<HUDProps> = ({
     try { e.currentTarget.releasePointerCapture(e.pointerId); } catch {}
   };
 
+  const touchStateRef = useRef({
+    forward: false,
+    backward: false,
+    left: false,
+    right: false,
+    drift: false,
+    item: false,
+  });
+
   const [touchState, setTouchState] = useState({
     forward: false,
     backward: false,
@@ -117,8 +126,20 @@ export const HUD: React.FC<HUDProps> = ({
     item: false,
   });
 
-  const updateTouch = (key: keyof typeof touchState, value: boolean) => {
-    const next = { ...touchState, [key]: value };
+  const updateTouch = (key: keyof typeof touchState, value: boolean, e?: React.PointerEvent) => {
+    if (e) {
+      if (value) {
+        try {
+          e.currentTarget.setPointerCapture(e.pointerId);
+        } catch {}
+      } else {
+        try {
+          e.currentTarget.releasePointerCapture(e.pointerId);
+        } catch {}
+      }
+    }
+    touchStateRef.current[key] = value;
+    const next = { ...touchStateRef.current };
     setTouchState(next);
     if (onTouchInput) onTouchInput(next);
   };
@@ -151,7 +172,7 @@ export const HUD: React.FC<HUDProps> = ({
 
   return (
     <div
-      className="absolute inset-0 pointer-events-none select-none overflow-hidden flex flex-col justify-between p-3 md:p-6"
+      className="absolute inset-0 select-none overflow-hidden flex flex-col justify-between p-3 md:p-6"
       onKeyDown={(e) => e.stopPropagation()}
     >
       {/* LAYER 3 (z-30): Lap / Rank Badge */}
@@ -172,6 +193,7 @@ export const HUD: React.FC<HUDProps> = ({
 
           <button
             onClick={() => setShowPlayerList(!showPlayerList)}
+            style={{ touchAction: 'manipulation' }}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-cyan-500/40 text-cyan-300 text-xs font-bold shadow-lg backdrop-blur-md transition-all cursor-pointer"
             title="레이서 순위"
           >
@@ -181,6 +203,7 @@ export const HUD: React.FC<HUDProps> = ({
 
           <button
             onClick={() => setIsMapHidden(!isMapHidden)}
+            style={{ touchAction: 'manipulation' }}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-cyan-500/40 text-cyan-300 text-xs font-bold shadow-lg backdrop-blur-md transition-all cursor-pointer"
             title="미니맵 토글"
           >
@@ -190,6 +213,7 @@ export const HUD: React.FC<HUDProps> = ({
 
           <button
             onClick={() => setShowMobileControls(!showMobileControls)}
+            style={{ touchAction: 'manipulation' }}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-cyan-500/40 text-cyan-300 text-xs font-bold shadow-lg backdrop-blur-md transition-all cursor-pointer"
             title="모바일 버튼 숨기기/보이기"
           >
@@ -199,6 +223,7 @@ export const HUD: React.FC<HUDProps> = ({
 
           <button
             onClick={() => setShowForfeitModal(true)}
+            style={{ touchAction: 'manipulation' }}
             className={`flex items-center gap-1.5 px-3 py-2 rounded-xl ${isDarkMode ? 'bg-slate-900/90 hover:bg-rose-950/80 border-slate-700 hover:border-rose-600 text-slate-300 hover:text-rose-200' : 'bg-white hover:bg-rose-100 border-slate-300 hover:border-rose-300 text-slate-700 hover:text-rose-700'} text-xs font-bold shadow-lg transition-all active:scale-95 cursor-pointer`}
             title="포기하고 나가기"
           >
@@ -218,6 +243,7 @@ export const HUD: React.FC<HUDProps> = ({
               <button
                 key={emoji}
                 onClick={() => onSendQuickChat(emoji, emoji)}
+                style={{ touchAction: 'manipulation' }}
                 className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-cyan-500/40 text-base font-bold flex items-center justify-center transition-all hover:scale-110 active:scale-95 cursor-pointer shadow-sm"
                 title={emoji}
               >
@@ -249,17 +275,17 @@ export const HUD: React.FC<HUDProps> = ({
 
       {/* LAYER 4 (z-25): Minimap & LAYER 5 (z-20): Leaderboard showing Player & AI ranks & laps */}
       <div
-        className={`absolute top-20 right-4 z-20 pointer-events-auto flex flex-col gap-2.5 w-56 transition-opacity duration-300 cursor-move ${isMapHidden ? 'translate-x-60 opacity-0 pointer-events-none' : 'translate-x-0 opacity-100'}`}
+        className={`absolute top-16 md:top-20 right-2 md:right-4 z-20 pointer-events-auto flex flex-col gap-2 w-36 md:w-48 transition-opacity duration-300 cursor-move ${isMapHidden ? 'translate-x-60 opacity-0 pointer-events-none' : 'translate-x-0 opacity-100'}`}
         style={{ transform: `translate(${minimapOffset.x}px, ${minimapOffset.y}px)` }}
         onPointerDown={handleMinimapPointerDown}
         onPointerMove={handleMinimapPointerMove}
         onPointerUp={handleMinimapPointerUp}
       >
-        <div className="bg-slate-950/90 border border-cyan-500/40 rounded-2xl p-2.5 backdrop-blur-md w-full h-36 flex flex-col items-center justify-center relative shadow-xl z-20">
-          <div className="absolute top-1 left-2 text-[9px] font-bold text-cyan-400 flex items-center gap-1">
-            <Compass size={11} /> 서킷 미니맵 <Move size={10} className="ml-1 opacity-70" />
+        <div className="bg-slate-950/90 border border-cyan-500/40 rounded-2xl p-2 backdrop-blur-md w-full h-28 md:h-32 flex flex-col items-center justify-center relative shadow-xl z-20">
+          <div className="absolute top-1 left-2 text-[8px] md:text-[9px] font-bold text-cyan-400 flex items-center gap-1">
+            <Compass size={10} /> 서킷 미니맵 <Move size={9} className="ml-1 opacity-70" />
           </div>
-          <div className="relative w-28 h-28 rounded-full border border-cyan-500/30 bg-slate-900/80 flex items-center justify-center overflow-hidden">
+          <div className="relative w-20 h-20 md:w-24 md:h-24 rounded-full border border-cyan-500/30 bg-slate-900/80 flex items-center justify-center overflow-hidden">
             <svg className="absolute inset-0 w-full h-full opacity-70" viewBox="0 0 100 100">
               <circle cx="50" cy="50" r="38" fill="none" stroke="#06b6d4" strokeWidth="4" strokeDasharray="6 4" />
             </svg>
@@ -268,8 +294,8 @@ export const HUD: React.FC<HUDProps> = ({
               const angle = t * Math.PI * 2 - Math.PI / 2;
               return (
                 <div
-                  className="absolute w-3 h-3 rounded-full bg-cyan-400 border-2 border-white shadow-[0_0_10px_#06b6d4] z-20 transition-all duration-75"
-                  style={{ left: `calc(50% + ${Math.cos(angle) * 36}px - 6px)`, top: `calc(50% + ${Math.sin(angle) * 36}px - 6px)` }}
+                  className="absolute w-2.5 h-2.5 md:w-3 md:h-3 rounded-full bg-cyan-400 border-2 border-white shadow-[0_0_10px_#06b6d4] z-20 transition-all duration-75"
+                  style={{ left: `calc(50% + ${Math.cos(angle) * (window.innerWidth < 768 ? 30 : 36)}px - 5px)`, top: `calc(50% + ${Math.sin(angle) * (window.innerWidth < 768 ? 30 : 36)}px - 5px)` }}
                   title="내 차량"
                 />
               ) as React.ReactNode;
@@ -280,8 +306,8 @@ export const HUD: React.FC<HUDProps> = ({
               return (
                 <div
                   key={b.id}
-                  className="absolute w-2 h-2 rounded-full bg-rose-500 border border-white z-10 transition-all duration-75"
-                  style={{ left: `calc(50% + ${Math.cos(angle) * 34}px - 4px)`, top: `calc(50% + ${Math.sin(angle) * 34}px - 4px)` }}
+                  className="absolute w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-rose-500 border border-white z-10 transition-all duration-75"
+                  style={{ left: `calc(50% + ${Math.cos(angle) * (window.innerWidth < 768 ? 28 : 34)}px - 3px)`, top: `calc(50% + ${Math.sin(angle) * (window.innerWidth < 768 ? 28 : 34)}px - 3px)` }}
                   title={b.name}
                 />
               );
@@ -292,8 +318,8 @@ export const HUD: React.FC<HUDProps> = ({
               return (
                 <div
                   key={p.id}
-                  className="absolute w-2.5 h-2.5 rounded-full bg-purple-500 border border-white z-15 transition-all duration-75"
-                  style={{ left: `calc(50% + ${Math.cos(angle) * 35}px - 5px)`, top: `calc(50% + ${Math.sin(angle) * 35}px - 5px)` }}
+                  className="absolute w-2 h-2 md:w-2.5 md:h-2.5 rounded-full bg-purple-500 border border-white z-15 transition-all duration-75"
+                  style={{ left: `calc(50% + ${Math.cos(angle) * (window.innerWidth < 768 ? 29 : 35)}px - 4px)`, top: `calc(50% + ${Math.sin(angle) * (window.innerWidth < 768 ? 29 : 35)}px - 4px)` }}
                   title={p.name}
                 />
               );
@@ -302,21 +328,23 @@ export const HUD: React.FC<HUDProps> = ({
         </div>
 
         {/* Real-time Leaderboard showing Player & AI ranks and laps precisely */}
-        <div className="bg-slate-950/95 border border-cyan-500/50 rounded-2xl p-3 backdrop-blur-xl w-full shadow-2xl z-10">
-          <div className="flex justify-between items-center mb-2 pb-1 border-b border-slate-800 text-xs font-bold text-cyan-400">
-            <span>실시간 순위 (Player & AI)</span>
-            <span>LAP {currentLap}/{totalLaps}</span>
+        <div className="bg-slate-950/95 border border-cyan-500/50 rounded-2xl p-2 backdrop-blur-xl w-full shadow-2xl z-10">
+          <div className="flex justify-between items-center mb-1 pb-0.5 border-b border-slate-800 text-[9px] md:text-xs font-bold text-cyan-400">
+            <span>실시간 순위</span>
+            <span>LAP {Math.min(currentLap, totalLaps)}/{totalLaps}</span>
           </div>
-          <div className="space-y-1.5 max-h-44 overflow-y-auto pr-1 text-xs">
+          <div className="space-y-1 max-h-28 md:max-h-36 overflow-y-auto pr-1 text-[9px] md:text-xs">
             {/* Combine player, peers, and bots into sorted leaderboard */}
             {(() => {
               const allRacersList = [
-                { id: playerInfo.id, name: playerInfo.name, isPlayer: true, lap: currentLap, progress: vehicleState?.totalProgress || 0 },
-                ...bots.map(b => ({ id: b.id, name: b.name, isPlayer: false, lap: b.lap, progress: b.totalProgress })),
-                ...Array.from(peerPlayers.values()).map(p => ({ id: p.id, name: p.name, isPlayer: false, lap: p.lap, progress: p.progress })),
+                { id: playerInfo.id, name: playerInfo.name, isPlayer: true, lap: Math.min(currentLap, totalLaps), progress: vehicleState?.totalProgress || 0, isFinished: vehicleState?.isFinished || false },
+                ...bots.map(b => ({ id: b.id, name: b.name, isPlayer: false, lap: Math.min(b.lap, totalLaps), progress: b.totalProgress, isFinished: b.isFinished })),
+                ...Array.from(peerPlayers.values()).map(p => ({ id: p.id, name: p.name, isPlayer: false, lap: Math.min(p.lap, totalLaps), progress: p.progress, isFinished: p.finished })),
               ];
 
               allRacersList.sort((a, b) => {
+                if (a.isFinished && !b.isFinished) return -1;
+                if (!a.isFinished && b.isFinished) return 1;
                 if (a.lap !== b.lap) return b.lap - a.lap; // Strict lap priority
                 return b.progress - a.progress;
               });
@@ -324,17 +352,19 @@ export const HUD: React.FC<HUDProps> = ({
               return allRacersList.map((racer, index) => (
                 <div
                   key={racer.id}
-                  className={`flex justify-between items-center px-2.5 py-1.5 rounded-lg border ${
+                  className={`flex justify-between items-center px-1.5 py-1 rounded-lg border ${
                     racer.isPlayer
                       ? 'bg-cyan-500/25 text-cyan-200 font-bold border-cyan-500/50'
                       : 'bg-slate-900/90 text-slate-300 border-slate-800'
                   }`}
                 >
-                  <span className="flex items-center gap-2 truncate">
-                    <span className={`w-2 h-2 rounded-full ${racer.isPlayer ? 'bg-cyan-400 shadow-[0_0_8px_#06b6d4]' : 'bg-rose-500'}`} />
+                  <span className="flex items-center gap-1.5 truncate">
+                    <span className={`w-1.5 h-1.5 rounded-full ${racer.isPlayer ? 'bg-cyan-400 shadow-[0_0_8px_#06b6d4]' : 'bg-rose-500'}`} />
                     <span>{index + 1}. {racer.name}</span>
                   </span>
-                  <span className="font-mono font-semibold text-amber-400">Lap {racer.lap}/{totalLaps}</span>
+                  <span className="font-mono font-semibold text-amber-400">
+                    {racer.isFinished ? '🏆' : `Lap ${racer.lap}/${totalLaps}`}
+                  </span>
                 </div>
               ));
             })()}
@@ -366,75 +396,88 @@ export const HUD: React.FC<HUDProps> = ({
 
       {/* LAYER 1 (z-50): 조작 (Touch / Steering Controls) */}
       {!isFinished && showMobileControls && (
-        <div className="flex justify-between items-end w-full pointer-events-auto pb-12 px-2 z-50">
-          <div className="flex gap-3 bg-slate-950/40 p-2.5 rounded-3xl backdrop-blur-md border border-cyan-500/20 shadow-lg">
+        <div className="flex justify-between items-end w-full pointer-events-auto pb-10 px-2 md:px-6 z-50">
+          {/* Left steering buttons: Left / Right */}
+          <div className="flex gap-2.5 bg-slate-950/60 p-2.5 rounded-3xl backdrop-blur-md border border-cyan-500/30 shadow-2xl">
             <button
-              onPointerDown={() => updateTouch('left', true)}
-              onPointerUp={() => updateTouch('left', false)}
-              onPointerCancel={() => updateTouch('left', false)}
-              onPointerLeave={() => updateTouch('left', false)}
-              className={`w-14 h-14 rounded-2xl font-black text-lg shadow-md transition-all cursor-pointer ${
-                touchState.left ? 'bg-cyan-500 text-white scale-95 shadow-cyan-500/50' : 'bg-slate-900/50 text-cyan-300 border border-cyan-500/30'
+              style={{ touchAction: 'manipulation' }}
+              onPointerDown={(e) => { e.preventDefault(); updateTouch('left', true); }}
+              onPointerUp={(e) => updateTouch('left', false)}
+              onPointerCancel={(e) => updateTouch('left', false)}
+              className={`w-20 h-20 rounded-2xl font-black text-xl shadow-md transition-transform cursor-pointer flex items-center justify-center ${
+                touchState.left ? 'bg-cyan-500 text-white scale-95 shadow-cyan-500/50' : 'bg-slate-900/80 text-cyan-300 border border-cyan-500/40 hover:bg-slate-800'
               }`}
             >
               ◀
             </button>
             <button
-              onPointerDown={() => updateTouch('right', true)}
-              onPointerUp={() => updateTouch('right', false)}
-              onPointerCancel={() => updateTouch('right', false)}
-              onPointerLeave={() => updateTouch('right', false)}
-              className={`w-14 h-14 rounded-2xl font-black text-lg shadow-md transition-all cursor-pointer ${
-                touchState.right ? 'bg-cyan-500 text-white scale-95 shadow-cyan-500/50' : 'bg-slate-900/50 text-cyan-300 border border-cyan-500/30'
+              style={{ touchAction: 'manipulation' }}
+              onPointerDown={(e) => { e.preventDefault(); updateTouch('right', true); }}
+              onPointerUp={(e) => updateTouch('right', false)}
+              onPointerCancel={(e) => updateTouch('right', false)}
+              className={`w-20 h-20 rounded-2xl font-black text-xl shadow-md transition-transform cursor-pointer flex items-center justify-center ${
+                touchState.right ? 'bg-cyan-500 text-white scale-95 shadow-cyan-500/50' : 'bg-slate-900/80 text-cyan-300 border border-cyan-500/40 hover:bg-slate-800'
               }`}
             >
               ▶
             </button>
           </div>
 
+          {/* Right driving buttons: Gas, Reverse, and Drift UNDERNEATH */}
           <div className="flex flex-col gap-2 items-end">
-            {currentItem && (
+            <div className="flex flex-col gap-4 items-end">
+              {currentItem && (
+                <button
+                  onClick={onUseItem}
+                  style={{ touchAction: 'manipulation' }}
+                  className="w-20 h-11 rounded-2xl bg-amber-500 hover:bg-amber-400 active:scale-95 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow-xl backdrop-blur-md border border-amber-300 cursor-pointer animate-pulse"
+                >
+                  <span>{getItemLabel(currentItem).icon}</span>
+                  <span>사용</span>
+                </button>
+              )}
+              {/* DRIFT button MOVED ABOVE gas/brake cluster */}
               <button
-                onClick={onUseItem}
-                className="w-16 h-12 rounded-2xl bg-amber-500/80 active:scale-95 text-white font-black text-xs flex items-center justify-center shadow-lg backdrop-blur-md border border-amber-400/40 cursor-pointer"
-              >
-                {getItemLabel(currentItem).icon} 사용
-              </button>
-            )}
-            <div className="flex gap-2 bg-slate-950/40 p-2.5 rounded-3xl backdrop-blur-md border border-cyan-500/20 shadow-lg">
-              <button
-                onPointerDown={() => updateTouch('drift', true)}
-                onPointerUp={() => updateTouch('drift', false)}
-                onPointerCancel={() => updateTouch('drift', false)}
-                onPointerLeave={() => updateTouch('drift', false)}
-                className={`w-14 h-14 rounded-2xl font-black text-xs shadow-md transition-all cursor-pointer ${
-                  touchState.drift ? 'bg-purple-600 text-white scale-95 shadow-purple-500/50' : 'bg-slate-900/50 text-purple-300 border border-purple-500/30'
+                style={{ touchAction: 'manipulation' }}
+                onPointerDown={(e) => { e.preventDefault(); updateTouch('drift', true); }}
+                onPointerUp={(e) => updateTouch('drift', false)}
+                onPointerCancel={(e) => updateTouch('drift', false)}
+                className={`w-full h-12 rounded-2xl font-black text-xs tracking-wider shadow-md transition-transform cursor-pointer flex items-center justify-center gap-1.5 ${
+                  touchState.drift ? 'bg-purple-600 text-white scale-95 shadow-purple-500/50' : 'bg-purple-950/70 text-purple-300 border border-purple-500/50 hover:bg-purple-900/80'
                 }`}
               >
-                DRIFT
+                <span>⚡</span>
+                <span>DRIFT (드리프트)</span>
               </button>
-              <button
-                onPointerDown={() => updateTouch('backward', true)}
-                onPointerUp={() => updateTouch('backward', false)}
-                onPointerCancel={() => updateTouch('backward', false)}
-                onPointerLeave={() => updateTouch('backward', false)}
-                className={`w-14 h-14 rounded-2xl font-black text-xs shadow-md transition-all cursor-pointer ${
-                  touchState.backward ? 'bg-rose-600 text-white scale-95 shadow-rose-500/50' : 'bg-slate-900/50 text-rose-300 border border-rose-500/30'
-                }`}
-              >
-                후진
-              </button>
-              <button
-                onPointerDown={() => updateTouch('forward', true)}
-                onPointerUp={() => updateTouch('forward', false)}
-                onPointerCancel={() => updateTouch('forward', false)}
-                onPointerLeave={() => updateTouch('forward', false)}
-                className={`w-14 h-14 rounded-2xl font-black text-xs shadow-md transition-all cursor-pointer ${
-                  touchState.forward ? 'bg-cyan-500 text-white scale-95 shadow-cyan-500/50' : 'bg-slate-900/50 text-cyan-300 border border-cyan-500/30'
-                }`}
-              >
-                악셀
-              </button>
+              <div className="flex flex-col gap-2 bg-slate-950/60 p-2.5 rounded-3xl backdrop-blur-md border border-cyan-500/30 shadow-2xl min-w-[140px]">
+                {/* Top row: 후진 & 가속(악셀) */}
+                <div className="flex gap-6">
+                  <button
+                    style={{ touchAction: 'manipulation' }}
+                    onPointerDown={(e) => { e.preventDefault(); updateTouch('backward', true); }}
+                    onPointerUp={(e) => updateTouch('backward', false)}
+                    onPointerCancel={(e) => updateTouch('backward', false)}
+                    className={`w-20 h-16 rounded-2xl font-black text-xs shadow-md transition-transform cursor-pointer flex flex-col items-center justify-center ${
+                      touchState.backward ? 'bg-rose-600 text-white scale-95 shadow-rose-500/50' : 'bg-slate-900/80 text-rose-300 border border-rose-500/40 hover:bg-slate-800'
+                    }`}
+                  >
+                    <span className="text-[9px] opacity-75">BRAKE</span>
+                    <span>후진</span>
+                  </button>
+                  <button
+                    style={{ touchAction: 'manipulation' }}
+                    onPointerDown={(e) => { e.preventDefault(); updateTouch('forward', true); }}
+                    onPointerUp={(e) => updateTouch('forward', false)}
+                    onPointerCancel={(e) => updateTouch('forward', false)}
+                    className={`w-20 h-16 rounded-2xl font-black text-xs shadow-md transition-transform cursor-pointer flex flex-col items-center justify-center ${
+                      touchState.forward ? 'bg-cyan-500 text-white scale-95 shadow-cyan-500/50' : 'bg-slate-900/80 text-cyan-300 border border-cyan-500/40 hover:bg-slate-800'
+                    }`}
+                  >
+                    <span className="text-[9px] opacity-75">GAS</span>
+                    <span>가속</span>
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>

@@ -198,62 +198,68 @@ export const Podium: React.FC<PodiumProps> = ({
 
   const formatTime = (ms: number) => {
     if (!ms) return 'DNF';
-    const totalSec = Math.floor(ms / 1000);
+    let duration = ms;
+    if (ms > 1000000000000) {
+      duration = ms % 300000;
+    }
+    const totalSec = Math.floor(duration / 1000);
     const minutes = Math.floor(totalSec / 60);
     const seconds = totalSec % 60;
-    const millis = Math.floor((ms % 1000) / 10);
+    const millis = Math.floor((duration % 1000) / 10);
     return `${minutes}:${seconds.toString().padStart(2, '0')}.${millis.toString().padStart(2, '0')}`;
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-transparent flex flex-col justify-between p-4 md:p-6 overflow-y-auto select-none pointer-events-none">
+    <div className="fixed inset-0 z-50 bg-black/50 flex flex-col justify-between p-4 md:p-6 overflow-y-auto select-none pointer-events-none backdrop-blur-sm">
       {/* 3D Stadium Car Showcase Lineup Background */}
       <div ref={mountRef} className="absolute inset-0 w-full h-full pointer-events-auto z-0" />
 
       {/* Top Banner */}
       <div className="relative z-10 flex flex-col items-center mt-2 pointer-events-auto">
         <h1 className="text-3xl md:text-5xl font-black text-white italic tracking-tight drop-shadow-[0_0_25px_rgba(6,182,212,0.9)]">
-          🏆 최종 순위 & 쇼룸 라인업
+          🏆 최종 순위표
         </h1>
       </div>
 
-      <div className="relative z-10 flex-grow pointer-events-none min-h-[160px]" />
+      <div className="relative z-10 flex-grow pointer-events-none min-h-[60px]" />
 
-      {/* Bottom Info & 10s Countdown Notice */}
-      <div className="relative z-10 flex flex-col items-center gap-3 w-full max-w-xl mx-auto pointer-events-auto">
-        <div className="w-full bg-slate-950/80 border border-cyan-500/40 rounded-2xl p-3 shadow-2xl backdrop-blur-md max-h-36 overflow-y-auto">
-          <h4 className="text-xs font-bold text-cyan-400 uppercase tracking-wider mb-2 flex items-center justify-between">
-            <span className="flex items-center gap-1.5">
-              <Flag size={13} className="text-cyan-400" /> 최종 순위 (진행도 기준)
+      {/* Bottom Info & Large Leaderboard */}
+      <div className="relative z-10 flex flex-col items-center gap-3 w-full max-w-2xl mx-auto pointer-events-auto pb-4">
+        <div className="w-full bg-slate-950/95 border-2 border-cyan-500/50 rounded-3xl p-4 md:p-5 shadow-[0_0_40px_rgba(6,182,212,0.4)] backdrop-blur-xl max-h-80 overflow-y-auto">
+          <h4 className="text-sm font-black text-cyan-400 uppercase tracking-wider mb-3 flex items-center justify-between border-b border-slate-800 pb-2">
+            <span className="flex items-center gap-2">
+              <Flag size={16} className="text-cyan-400" /> 최종 경기 순위 (Player & AI)
             </span>
-            <span className="text-[10px] text-slate-400">총 {sortedResults.length}명</span>
+            <span className="text-xs text-slate-400">총 {sortedResults.length}명 완주 및 순위</span>
           </h4>
-          <div className="space-y-1">
+          <div className="space-y-1.5">
             {sortedResults.map((player, idx) => (
               <div
                 key={player.id}
-                className={`flex items-center justify-between p-1.5 rounded-xl border text-xs ${
+                className={`flex items-center justify-between p-2.5 rounded-2xl border text-xs md:text-sm transition-all ${
                   player.id === currentPlayerId
-                    ? 'bg-cyan-500/30 border-cyan-400 text-cyan-200 font-bold shadow-[0_0_10px_rgba(6,182,212,0.3)]'
-                    : 'bg-slate-900/60 border-slate-800 text-slate-300'
+                    ? 'bg-cyan-500/30 border-cyan-400 text-white font-black shadow-[0_0_15px_rgba(6,182,212,0.4)] scale-[1.01]'
+                    : 'bg-slate-900/80 border-slate-800 text-slate-200'
                 }`}
               >
-                <div className="flex items-center gap-2">
-                  <span className="w-5 text-center font-mono font-bold text-amber-400">
-                    {idx + 1}
+                <div className="flex items-center gap-3">
+                  <span className={`w-7 text-center font-mono font-black text-sm md:text-base ${
+                    idx === 0 ? 'text-amber-400' : idx === 1 ? 'text-slate-300' : idx === 2 ? 'text-amber-600' : 'text-slate-500'
+                  }`}>
+                    {idx === 0 ? '🥇 1' : idx === 1 ? '🥈 2' : idx === 2 ? '🥉 3' : `${idx + 1}`}
                   </span>
                   <span
-                    className="w-3 h-3 rounded-full border border-white/40 shadow-sm"
+                    className="w-4 h-4 rounded-full border border-white/60 shadow-sm"
                     style={{ backgroundColor: player.carColor }}
                   />
-                  <span className="truncate max-w-[130px] md:max-w-[200px]">{player.name}</span>
+                  <span className="font-bold truncate max-w-[150px] md:max-w-[260px]">{player.name}</span>
                   {player.id === currentPlayerId && (
-                    <span className="text-[9px] px-1 rounded bg-cyan-500/20 text-cyan-300">YOU</span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-cyan-500 text-slate-950 font-black">YOU</span>
                   )}
                 </div>
-                <div className="flex items-center gap-1 font-mono text-[11px] text-slate-300">
-                  <Clock size={11} className="text-cyan-400" />
-                  <span>{player.finished ? formatTime(player.finishTime) : `Lap ${Math.floor(player.progress || 1)}`}</span>
+                <div className="flex items-center gap-1.5 font-mono text-xs md:text-sm font-semibold text-cyan-300">
+                  <Clock size={13} className="text-cyan-400" />
+                  <span>{player.finished ? formatTime(player.finishTime) : `Lap ${Math.min(player.lap || 1, 2)}`}</span>
                 </div>
               </div>
             ))}
@@ -261,23 +267,23 @@ export const Podium: React.FC<PodiumProps> = ({
         </div>
 
         {/* 10 seconds exit notice banner */}
-        <div className="w-full bg-cyan-500/90 text-slate-950 font-black px-6 py-2.5 rounded-2xl shadow-2xl text-center text-sm md:text-base border border-cyan-300 animate-pulse">
-          ⏳ 10초 뒤에 로비로 나가집니다 ({countdown}초)
+        <div className="w-full bg-gradient-to-r from-amber-500 via-cyan-400 to-amber-500 text-slate-950 font-black px-6 py-3 rounded-2xl shadow-2xl text-center text-sm md:text-base border border-cyan-200 animate-pulse tracking-wide">
+          ⏳ 10초 뒤에 자동으로 로비로 나갑니다 ({countdown}초)
         </div>
 
         <div className="flex items-center gap-3 w-full justify-center">
           <button
             onClick={onReturnToLobby}
-            className="flex-1 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-white font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-lg"
+            className="flex-1 py-3.5 rounded-2xl bg-rose-600 hover:bg-rose-500 active:scale-95 text-white font-black text-sm flex items-center justify-center gap-2 transition-all shadow-xl cursor-pointer"
           >
-            <ArrowRight size={14} /> 로비로 즉시 나가기
+            <ArrowRight size={16} /> 지금 즉시 나가기 (로비 복귀)
           </button>
           {isHost && (
             <button
               onClick={onRematch}
-              className="flex-1 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black text-xs flex items-center justify-center gap-2 transition-all shadow-xl"
+              className="flex-1 py-3.5 rounded-2xl bg-cyan-500 hover:bg-cyan-400 active:scale-95 text-slate-950 font-black text-sm flex items-center justify-center gap-2 transition-all shadow-xl cursor-pointer"
             >
-              <RotateCcw size={14} /> 재경기
+              <RotateCcw size={16} /> 다시 시작 (재경기)
             </button>
           )}
         </div>

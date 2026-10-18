@@ -39,6 +39,18 @@ export default function App() {
   const socketRef = useRef<WebSocket | null>(null);
   const peerStatesRef = useRef<Map<string, PeerCarState>>(new Map());
   const resetCarRef = useRef<(() => void) | null>(null);
+  const botsRef = useRef<BotRacer[]>([]);
+  const vehicleStateRef = useRef<VehicleState | null>(null);
+
+  const handleUpdateBots = (newBots: BotRacer[]) => {
+    botsRef.current = newBots;
+    setBots(newBots);
+  };
+
+  const handleUpdateVehicleState = (state: VehicleState) => {
+    vehicleStateRef.current = state;
+    setVehicleState(state);
+  };
 
   const [touchInputs, setTouchInputs] = useState({
     forward: false,
@@ -180,7 +192,13 @@ export default function App() {
     };
   }, []);
 
-  const handleQuickStart = (trackId: TrackId, customization: CarCustomization, riderName: string) => {
+  const handleQuickStart = (
+    trackId: TrackId,
+    customization: CarCustomization,
+    riderName: string,
+    botsCount: number = 4,
+    difficulty: AIDifficulty = 'medium'
+  ) => {
     finishCountdownStartedRef.current = false;
     setFinishCountdownNotice(null);
     const myId = `player_${Math.random().toString(36).substring(2, 7)}`;
@@ -208,8 +226,8 @@ export default function App() {
       trackId,
       laps: 2,
       gameMode: 'solo',
-      aiDifficulty: 'medium',
-      aiBotsCount: 4,
+      aiDifficulty: difficulty,
+      aiBotsCount: botsCount,
       state: 'countdown',
       players: [player],
     };
@@ -364,7 +382,7 @@ export default function App() {
     }
   };
 
-  const handleFinishRace = (finishTime: number) => {
+  const handleFinishRace = (finishTime: number, winnerName?: string) => {
     if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
       socketRef.current.send(
         JSON.stringify({
@@ -377,87 +395,91 @@ export default function App() {
     if (currentPlayer && !finishCountdownStartedRef.current) {
       finishCountdownStartedRef.current = true;
       let leftSec = 10;
-      setFinishCountdownNotice(`🏆 선두 결승선 통과! 10초 후 경기 종료 및 순위 산출 (${leftSec}초)`);
+      const displayName = winnerName || currentPlayer.name || '선두 레이서';
+      setFinishCountdownNotice(`⏱️ [${displayName}] 1등 완주! 10초 후 레이스 종료 & 순위 산출 (${leftSec}초)`);
       sound.playVictoryFanfare();
 
-        const timer = setInterval(() => {
-          leftSec--;
-          if (leftSec <= 0) {
-            clearInterval(timer);
-            setFinishCountdownNotice(null);
+      const timer = setInterval(() => {
+        leftSec--;
+        if (leftSec <= 0) {
+          clearInterval(timer);
+          setFinishCountdownNotice(null);
 
-            const allRacers = [
-              {
-                id: currentPlayer.id,
-                name: currentPlayer.name,
-                carModel: currentPlayer.carModel,
-                carColor: currentPlayer.carColor,
-                accentColor: currentPlayer.accentColor,
-                neonColor: currentPlayer.neonColor,
-                lap: vehicleState?.currentLap || 1,
-                progress: vehicleState?.totalProgress || 0,
-                finished: vehicleState?.isFinished || false,
-                time: vehicleState?.finishTime || Date.now(),
-              },
-              ...bots.map((b) => ({
-                id: b.id,
-                name: b.name,
-                carModel: b.carModel,
-                carColor: b.carColor,
-                accentColor: b.accentColor,
-                neonColor: b.neonColor,
-                lap: b.lap,
-                progress: b.totalProgress,
-                finished: b.isFinished,
-                time: b.finishTime || Date.now(),
-              })),
-              ...Array.from(peerPlayersMap.values()).map((p) => ({
-                id: p.id,
-                name: p.name,
-                carModel: p.carModel,
-                carColor: p.carColor,
-                accentColor: p.accentColor,
-                neonColor: p.neonColor,
-                lap: p.lap,
-                progress: p.progress,
-                finished: p.finished,
-                time: p.finishTime || Date.now(),
-              })),
-            ];
+          const curVehicle = vehicleStateRef.current;
+          const currentBots = botsRef.current.length > 0 ? botsRef.current : bots;
 
-            allRacers.sort((a, b) => {
-              if (a.finished && b.finished) return a.time - b.time;
-              if (a.finished) return -1;
-              if (b.finished) return 1;
-              if (a.lap !== b.lap) return b.lap - a.lap;
-              return b.progress - a.progress;
-            });
+          const allRacers = [
+            {
+              id: currentPlayer.id,
+              name: currentPlayer.name,
+              carModel: currentPlayer.carModel,
+              carColor: currentPlayer.carColor,
+              accentColor: currentPlayer.accentColor,
+              neonColor: currentPlayer.neonColor,
+              lap: Math.min(curVehicle?.currentLap || 1, roomState?.laps || 2),
+              progress: curVehicle?.totalProgress || 0,
+              finished: curVehicle?.isFinished || false,
+              time: curVehicle?.finishTime || Date.now(),
+            },
+            ...currentBots.map((b) => ({
+              id: b.id,
+              name: b.name,
+              carModel: b.carModel,
+              carColor: b.carColor,
+              accentColor: b.accentColor,
+              neonColor: b.neonColor,
+              lap: Math.min(b.lap, roomState?.laps || 2),
+              progress: b.totalProgress,
+              finished: b.isFinished,
+              time: b.finishTime || Date.now(),
+            })),
+            ...Array.from(peerPlayersMap.values()).map((p) => ({
+              id: p.id,
+              name: p.name,
+              carModel: p.carModel,
+              carColor: p.carColor,
+              accentColor: p.accentColor,
+              neonColor: p.neonColor,
+              lap: Math.min(p.lap, roomState?.laps || 2),
+              progress: p.progress,
+              finished: p.finished,
+              time: p.finishTime || Date.now(),
+            })),
+          ];
 
-            const finalResults: PlayerInfo[] = allRacers.map((r, idx) => ({
-              id: r.id,
-              name: r.name,
-              carModel: r.carModel,
-              carColor: r.carColor,
-              accentColor: r.accentColor,
-              neonColor: r.neonColor,
-              isHost: r.id === currentPlayer.id,
-              isReady: true,
-              team: 'none',
-              lap: r.lap,
-              checkpoint: 0,
-              progress: r.progress,
-              finished: r.finished,
-              finishTime: r.time,
-              place: idx + 1,
-            }));
+          allRacers.sort((a, b) => {
+            if (a.finished && b.finished) return a.time - b.time;
+            if (a.finished) return -1;
+            if (b.finished) return 1;
+            if (a.lap !== b.lap) return b.lap - a.lap;
+            return b.progress - a.progress;
+          });
 
-            setRaceResults(finalResults);
-            setRoomState((prev) => (prev ? { ...prev, state: 'finished' } : null));
-          } else {
-            setFinishCountdownNotice(`🏆 선두 결승선 통과! 10초 후 경기 종료 및 순위 산출 (${leftSec}초)`);
-          }
-        }, 1000);
-      }
+          const finalResults: PlayerInfo[] = allRacers.map((r, idx) => ({
+            id: r.id,
+            name: r.name,
+            carModel: r.carModel,
+            carColor: r.carColor,
+            accentColor: r.accentColor,
+            neonColor: r.neonColor,
+            isHost: r.id === currentPlayer.id,
+            isReady: true,
+            team: 'none',
+            lap: r.lap,
+            checkpoint: 0,
+            progress: r.progress,
+            finished: r.finished,
+            finishTime: r.time,
+            place: idx + 1,
+          }));
+
+          setRaceResults(finalResults);
+          setRoomState((prev) => (prev ? { ...prev, state: 'finished' } : null));
+        } else {
+          setFinishCountdownNotice(`⏱️ [${displayName}] 1등 완주! 10초 후 레이스 종료 & 순위 산출 (${leftSec}초)`);
+        }
+      }, 1000);
+    }
   };
 
   const handleItemUsed = (type: string, position: any) => {
@@ -578,7 +600,7 @@ export default function App() {
             playerInfo={currentPlayer}
             peerPlayers={peerPlayersMap}
             peerStatesRef={peerStatesRef}
-            onStateUpdate={setVehicleState}
+            onStateUpdate={handleUpdateVehicleState}
             onSendCarUpdate={handleSendCarUpdate}
             onFinishRace={handleFinishRace}
             onItemUsed={handleItemUsed}
@@ -588,7 +610,7 @@ export default function App() {
             isRacing={roomState.state === 'racing'}
             graphicsQuality={graphicsQuality}
             resetCarRef={resetCarRef}
-            onBotsUpdate={setBots}
+            onBotsUpdate={handleUpdateBots}
           />
           <HUD
             vehicleState={vehicleState}
@@ -617,8 +639,10 @@ export default function App() {
       )}
 
       {finishCountdownNotice && (
-        <div className="fixed top-16 left-1/2 transform -translate-x-1/2 z-50 bg-amber-500/90 text-slate-950 font-black px-6 py-2.5 rounded-2xl shadow-2xl animate-bounce text-sm md:text-base border border-amber-300">
-          {finishCountdownNotice}
+        <div className="fixed top-14 left-1/2 transform -translate-x-1/2 z-50 pointer-events-none px-4 max-w-xl w-full flex justify-center">
+          <div className="bg-gradient-to-r from-amber-500 via-orange-500 to-amber-500 text-slate-950 font-black px-6 py-3 rounded-2xl shadow-[0_0_35px_rgba(245,158,11,0.9)] border-2 border-amber-200 text-center text-sm md:text-base tracking-wide flex items-center gap-2 animate-bounce">
+            <span>{finishCountdownNotice}</span>
+          </div>
         </div>
       )}
 

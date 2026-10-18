@@ -241,6 +241,7 @@ export class PhysicsEngine {
         state.isDrifting = false;
         state.driftChargeTime = 0;
         state.driftBoostLevel = 0;
+        state.speedKmh *= 0.85; // Drift exit friction
       }
       state.driftAngle = THREE.MathUtils.damp(state.driftAngle, 0, 10, delta);
     }
@@ -311,14 +312,14 @@ export class PhysicsEngine {
   }
 
   private static updateProgress(state: VehicleState, track: TrackData, totalLaps: number) {
+    if (state.isFinished) return;
+
     let bestT = state.trackT || 0;
     let minDist = 999999;
-    const samples = 45;
-    const startT = Math.max(0, bestT - 0.25);
-    const endT = Math.min(1.0, bestT + 0.25);
-
-    for (let i = 0; i <= samples; i++) {
-      const t = startT + (i / samples) * (endT - startT);
+    const samples = 60;
+    for (let i = -15; i <= 25; i++) {
+      let t = (state.trackT + i / samples) % 1.0;
+      if (t < 0) t += 1.0;
       const pt = track.curve.getPointAt(t);
       const d = state.position.distanceTo(pt);
       if (d < minDist) {
@@ -327,39 +328,28 @@ export class PhysicsEngine {
       }
     }
 
-    for (let offset of [-1.0, 1.0]) {
-      const testT = state.trackT + offset;
-      if (testT >= 0 && testT <= 1) {
-        const pt = track.curve.getPointAt(testT);
-        const d = state.position.distanceTo(pt);
-        if (d < minDist) {
-          minDist = d;
-          bestT = testT >= 1 ? testT - 1 : testT < 0 ? testT + 1 : testT;
-        }
-      }
-    }
-
-    const distToStart = state.position.distanceTo(track.startPosition);
-    if (distToStart < 30 && state.trackT > 0.7) {
-      bestT = 0.01;
+    if (bestT > 0.4 && bestT < 0.7) {
+      state.hasReachedHalfway = true;
     }
 
     const prevT = state.trackT;
     state.trackT = bestT;
 
-    if (prevT > 0.8 && bestT < 0.2) {
-      state.currentLap += 1;
-      if (state.currentLap > totalLaps) {
+    if (prevT > 0.75 && bestT < 0.25 && state.hasReachedHalfway) {
+      state.hasReachedHalfway = false;
+      if (state.currentLap < totalLaps) {
+        state.currentLap += 1;
+        sound.playLapChime();
+      } else {
         state.isFinished = true;
         state.finishTime = Date.now();
+        state.currentLap = totalLaps;
         sound.playVictoryFanfare();
-      } else {
-        sound.playLapChime();
       }
     }
 
     state.currentCheckpoint = Math.floor(bestT * track.checkpoints.length);
-    state.totalProgress = state.currentLap - 1 + bestT;
+    state.totalProgress = (state.currentLap - 1) + (state.isFinished ? 1.0 : bestT);
   }
 
   public static useItem(state: VehicleState): { type: ItemType; position: THREE.Vector3 } | null {
@@ -508,10 +498,12 @@ export class PhysicsEngine {
       bot.trackT += deltaT;
       if (bot.trackT >= 1.0) {
         bot.trackT -= 1.0;
-        bot.lap += 1;
-        if (bot.lap > totalLaps) {
+        if (bot.lap < totalLaps) {
+          bot.lap += 1;
+        } else {
           bot.isFinished = true;
           bot.finishTime = Date.now();
+          bot.lap = totalLaps;
         }
       }
 

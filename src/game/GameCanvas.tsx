@@ -24,7 +24,7 @@ interface GameCanvasProps {
   peerStatesRef: React.MutableRefObject<Map<string, PeerCarState>>;
   onStateUpdate: (state: VehicleState) => void;
   onSendCarUpdate: (update: any) => void;
-  onFinishRace: (finishTime: number, results?: PlayerInfo[]) => void;
+  onFinishRace: (finishTime: number, winnerName?: string) => void;
   onItemUsed: (type: string, position: THREE.Vector3) => void;
   onBotsUpdate?: (bots: BotRacer[]) => void;
   cameraMode: number;
@@ -273,6 +273,9 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
     const peerVisualsMap = new Map<string, { visuals: CarVisuals, label: CSS2DObject }>();
     const bots = PhysicsEngine.initBots(aiBotsCount, track, aiDifficulty, gameMode);
+    if (onBotsUpdate) {
+      onBotsUpdate(bots.map((b) => ({ ...b })));
+    }
     const botVisualsMap = new Map<string, { visuals: CarVisuals, label: CSS2DObject }>();
 
     bots.forEach((bot) => {
@@ -354,6 +357,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     ro.observe(container);
 
     let lastNetworkSync = 0;
+    let lastBotUpdate = 0;
     const clock = new THREE.Clock();
     renderer.compile(scene, camera);
 
@@ -386,9 +390,11 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       if (isRacingRef.current) {
         PhysicsEngine.updatePlayer(playerState, inputRef.current, delta, track, totalLaps);
         PhysicsEngine.updateBots(bots, delta, track, totalLaps);
-        if (onBotsUpdate) {
-          onBotsUpdate(bots);
-        }
+      }
+
+      if (onBotsUpdate && now - lastBotUpdate > 100) {
+        lastBotUpdate = now;
+        onBotsUpdate(bots.map((b) => ({ ...b })));
       }
 
       activeTrapMeshes.forEach((trap, idx) => {
@@ -415,9 +421,12 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
       playerState.rank = allRacers.findIndex((r) => r.id === playerInfo.id) + 1;
 
-      if ((playerState.isFinished || bots.some((b) => b.isFinished)) && !finishTriggeredRef.current) {
+      const firstBot = bots.find((b) => b.isFinished);
+      if ((playerState.isFinished || firstBot) && !finishTriggeredRef.current) {
         finishTriggeredRef.current = true;
-        onFinishRace(playerState.finishTime || Date.now());
+        const winnerName = playerState.isFinished ? playerInfo.name : (firstBot ? firstBot.name : 'AI');
+        const winnerTime = playerState.isFinished ? (playerState.finishTime || Date.now()) : (firstBot?.finishTime || Date.now());
+        onFinishRace(winnerTime, winnerName);
       }
 
       playerVisuals.group.position.copy(playerState.position);
