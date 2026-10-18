@@ -1,0 +1,6 @@
+{
+  "name": "Turbo Drift 3D",
+  "description": "Multi-Player Real-Time 3D Racing Game with Arcade Physics, Custom Cars, Weapons & Tracks",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
