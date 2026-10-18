@@ -127,17 +127,6 @@ export const HUD: React.FC<HUDProps> = ({
   });
 
   const updateTouch = (key: keyof typeof touchState, value: boolean, e?: React.PointerEvent) => {
-    if (e) {
-      if (value) {
-        try {
-          e.currentTarget.setPointerCapture(e.pointerId);
-        } catch {}
-      } else {
-        try {
-          e.currentTarget.releasePointerCapture(e.pointerId);
-        } catch {}
-      }
-    }
     touchStateRef.current[key] = value;
     const next = { ...touchStateRef.current };
     setTouchState(next);
@@ -172,7 +161,7 @@ export const HUD: React.FC<HUDProps> = ({
 
   return (
     <div
-      className="absolute inset-0 select-none overflow-hidden flex flex-col justify-between p-3 md:p-6"
+      className="absolute inset-0 select-none overflow-hidden flex flex-col justify-between"
       onKeyDown={(e) => e.stopPropagation()}
     >
       {/* LAYER 3 (z-30): Lap / Rank Badge */}
@@ -192,7 +181,7 @@ export const HUD: React.FC<HUDProps> = ({
           </div>
 
           <button
-            onClick={() => setShowPlayerList(!showPlayerList)}
+            onPointerDown={(e) => { e.stopPropagation(); setShowPlayerList(!showPlayerList); }}
             style={{ touchAction: 'manipulation' }}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-cyan-500/40 text-cyan-300 text-xs font-bold shadow-lg backdrop-blur-md transition-all cursor-pointer"
             title="레이서 순위"
@@ -202,7 +191,7 @@ export const HUD: React.FC<HUDProps> = ({
           </button>
 
           <button
-            onClick={() => setIsMapHidden(!isMapHidden)}
+            onPointerDown={(e) => { e.stopPropagation(); setIsMapHidden(!isMapHidden); }}
             style={{ touchAction: 'manipulation' }}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-cyan-500/40 text-cyan-300 text-xs font-bold shadow-lg backdrop-blur-md transition-all cursor-pointer"
             title="미니맵 토글"
@@ -212,7 +201,7 @@ export const HUD: React.FC<HUDProps> = ({
           </button>
 
           <button
-            onClick={() => setShowMobileControls(!showMobileControls)}
+            onPointerDown={(e) => { e.stopPropagation(); setShowMobileControls(!showMobileControls); }}
             style={{ touchAction: 'manipulation' }}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-cyan-500/40 text-cyan-300 text-xs font-bold shadow-lg backdrop-blur-md transition-all cursor-pointer"
             title="모바일 버튼 숨기기/보이기"
@@ -222,7 +211,7 @@ export const HUD: React.FC<HUDProps> = ({
           </button>
 
           <button
-            onClick={() => setShowForfeitModal(true)}
+            onPointerDown={(e) => { e.stopPropagation(); setShowForfeitModal(true); }}
             style={{ touchAction: 'manipulation' }}
             className={`flex items-center gap-1.5 px-3 py-2 rounded-xl ${isDarkMode ? 'bg-slate-900/90 hover:bg-rose-950/80 border-slate-700 hover:border-rose-600 text-slate-300 hover:text-rose-200' : 'bg-white hover:bg-rose-100 border-slate-300 hover:border-rose-300 text-slate-700 hover:text-rose-700'} text-xs font-bold shadow-lg transition-all active:scale-95 cursor-pointer`}
             title="포기하고 나가기"
@@ -242,7 +231,7 @@ export const HUD: React.FC<HUDProps> = ({
             {['🔥', '👍', '😎', '🎉'].map((emoji) => (
               <button
                 key={emoji}
-                onClick={() => onSendQuickChat(emoji, emoji)}
+                onPointerDown={(e) => { e.stopPropagation(); onSendQuickChat(emoji, emoji); }}
                 style={{ touchAction: 'manipulation' }}
                 className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-cyan-500/40 text-base font-bold flex items-center justify-center transition-all hover:scale-110 active:scale-95 cursor-pointer shadow-sm"
                 title={emoji}
@@ -400,10 +389,10 @@ export const HUD: React.FC<HUDProps> = ({
           {/* Left steering buttons: Left / Right */}
           <div className="flex gap-2.5 bg-slate-950/60 p-2.5 rounded-3xl backdrop-blur-md border border-cyan-500/30 shadow-2xl">
             <button
-              style={{ touchAction: 'manipulation' }}
-              onPointerDown={(e) => { e.preventDefault(); updateTouch('left', true); }}
-              onPointerUp={(e) => updateTouch('left', false)}
-              onPointerCancel={(e) => updateTouch('left', false)}
+              style={{ touchAction: 'none' }}
+              onPointerDown={(e) => updateTouch('left', true, e)}
+              onPointerUp={(e) => updateTouch('left', false, e)}
+              onPointerCancel={(e) => updateTouch('left', false, e)}
               className={`w-20 h-20 rounded-2xl font-black text-xl shadow-md transition-transform cursor-pointer flex items-center justify-center ${
                 touchState.left ? 'bg-cyan-500 text-white scale-95 shadow-cyan-500/50' : 'bg-slate-900/80 text-cyan-300 border border-cyan-500/40 hover:bg-slate-800'
               }`}
@@ -411,10 +400,10 @@ export const HUD: React.FC<HUDProps> = ({
               ◀
             </button>
             <button
-              style={{ touchAction: 'manipulation' }}
-              onPointerDown={(e) => { e.preventDefault(); updateTouch('right', true); }}
-              onPointerUp={(e) => updateTouch('right', false)}
-              onPointerCancel={(e) => updateTouch('right', false)}
+              style={{ touchAction: 'none' }}
+              onPointerDown={(e) => updateTouch('right', true, e)}
+              onPointerUp={(e) => updateTouch('right', false, e)}
+              onPointerCancel={(e) => updateTouch('right', false, e)}
               className={`w-20 h-20 rounded-2xl font-black text-xl shadow-md transition-transform cursor-pointer flex items-center justify-center ${
                 touchState.right ? 'bg-cyan-500 text-white scale-95 shadow-cyan-500/50' : 'bg-slate-900/80 text-cyan-300 border border-cyan-500/40 hover:bg-slate-800'
               }`}
@@ -428,7 +417,7 @@ export const HUD: React.FC<HUDProps> = ({
             <div className="flex flex-col gap-4 items-end">
               {currentItem && (
                 <button
-                  onClick={onUseItem}
+                  onPointerDown={(e) => { e.stopPropagation(); onUseItem(); }}
                   style={{ touchAction: 'manipulation' }}
                   className="w-20 h-11 rounded-2xl bg-amber-500 hover:bg-amber-400 active:scale-95 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow-xl backdrop-blur-md border border-amber-300 cursor-pointer animate-pulse"
                 >
@@ -438,10 +427,10 @@ export const HUD: React.FC<HUDProps> = ({
               )}
               {/* DRIFT button MOVED ABOVE gas/brake cluster */}
               <button
-                style={{ touchAction: 'manipulation' }}
-                onPointerDown={(e) => { e.preventDefault(); updateTouch('drift', true); }}
-                onPointerUp={(e) => updateTouch('drift', false)}
-                onPointerCancel={(e) => updateTouch('drift', false)}
+                style={{ touchAction: 'none' }}
+                onPointerDown={(e) => updateTouch('drift', true, e)}
+                onPointerUp={(e) => updateTouch('drift', false, e)}
+                onPointerCancel={(e) => updateTouch('drift', false, e)}
                 className={`w-full h-12 rounded-2xl font-black text-xs tracking-wider shadow-md transition-transform cursor-pointer flex items-center justify-center gap-1.5 ${
                   touchState.drift ? 'bg-purple-600 text-white scale-95 shadow-purple-500/50' : 'bg-purple-950/70 text-purple-300 border border-purple-500/50 hover:bg-purple-900/80'
                 }`}
@@ -453,10 +442,10 @@ export const HUD: React.FC<HUDProps> = ({
                 {/* Top row: 후진 & 가속(악셀) */}
                 <div className="flex gap-6">
                   <button
-                    style={{ touchAction: 'manipulation' }}
-                    onPointerDown={(e) => { e.preventDefault(); updateTouch('backward', true); }}
-                    onPointerUp={(e) => updateTouch('backward', false)}
-                    onPointerCancel={(e) => updateTouch('backward', false)}
+                    style={{ touchAction: 'none' }}
+                    onPointerDown={(e) => updateTouch('backward', true, e)}
+                    onPointerUp={(e) => updateTouch('backward', false, e)}
+                    onPointerCancel={(e) => updateTouch('backward', false, e)}
                     className={`w-20 h-16 rounded-2xl font-black text-xs shadow-md transition-transform cursor-pointer flex flex-col items-center justify-center ${
                       touchState.backward ? 'bg-rose-600 text-white scale-95 shadow-rose-500/50' : 'bg-slate-900/80 text-rose-300 border border-rose-500/40 hover:bg-slate-800'
                     }`}
@@ -465,10 +454,10 @@ export const HUD: React.FC<HUDProps> = ({
                     <span>후진</span>
                   </button>
                   <button
-                    style={{ touchAction: 'manipulation' }}
-                    onPointerDown={(e) => { e.preventDefault(); updateTouch('forward', true); }}
-                    onPointerUp={(e) => updateTouch('forward', false)}
-                    onPointerCancel={(e) => updateTouch('forward', false)}
+                    style={{ touchAction: 'none' }}
+                    onPointerDown={(e) => updateTouch('forward', true, e)}
+                    onPointerUp={(e) => updateTouch('forward', false, e)}
+                    onPointerCancel={(e) => updateTouch('forward', false, e)}
                     className={`w-20 h-16 rounded-2xl font-black text-xs shadow-md transition-transform cursor-pointer flex flex-col items-center justify-center ${
                       touchState.forward ? 'bg-cyan-500 text-white scale-95 shadow-cyan-500/50' : 'bg-slate-900/80 text-cyan-300 border border-cyan-500/40 hover:bg-slate-800'
                     }`}
@@ -502,7 +491,7 @@ export const HUD: React.FC<HUDProps> = ({
           )}
         </button>
         <div
-          className={`w-full bg-slate-950/85 border border-cyan-500/30 rounded-2xl p-3 md:p-4 shadow-2xl backdrop-blur-xl transition-all duration-300 ${
+          className={`w-full rounded-2xl p-3 md:p-4 transition-all duration-300 ${
             isDockCollapsed ? 'translate-y-28 opacity-0 pointer-events-none' : 'translate-y-0 opacity-100'
           }`}
         >
@@ -555,7 +544,7 @@ export const HUD: React.FC<HUDProps> = ({
 
             <div className="flex items-center gap-1.5 md:gap-2">
               <button
-                onClick={onCycleCamera}
+                onPointerDown={(e) => { e.stopPropagation(); onCycleCamera(); }}
                 className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-black/40 hover:bg-black/60 border border-slate-700/50 text-slate-200 text-xs backdrop-blur-sm transition-colors cursor-pointer"
                 title="카메라 전환: [C]"
               >
@@ -564,7 +553,8 @@ export const HUD: React.FC<HUDProps> = ({
               </button>
 
               <button
-                onClick={() => {
+                onPointerDown={(e) => { 
+                  e.stopPropagation(); 
                   const muted = sound.toggleMute();
                   setIsMuted(muted);
                 }}
@@ -576,7 +566,8 @@ export const HUD: React.FC<HUDProps> = ({
                 {isMuted ? <VolumeX size={14} /> : <Volume2 size={14} />}
               </button>
               <button
-                onClick={() => {
+                onPointerDown={(e) => {
+                  e.stopPropagation();
                   const m = sound.toggleMusic();
                   setIsMusicMuted(m);
                 }}
@@ -603,7 +594,7 @@ export const HUD: React.FC<HUDProps> = ({
 
               {!isFinished && (
                 <button
-                  onClick={onResetCar}
+                  onPointerDown={(e) => { e.stopPropagation(); onResetCar(); }}
                   className="p-2 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-amber-400 transition-colors cursor-pointer"
                   title="차량 위치 리셋: [R]"
                 >
